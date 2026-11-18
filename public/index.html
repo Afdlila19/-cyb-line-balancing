@@ -135,6 +135,15 @@ mark{background:var(--chk-bg);color:inherit;padding:0 1px;border-radius:2px;font
 .stp .m small{display:block;font:400 12px "IBM Plex Sans",sans-serif;color:var(--muted)}
 .more{margin-top:14px}
 #lbody.has3d{max-width:1280px}
+.fbox{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:4px 0 6px}
+.fhd{display:flex;gap:10px;align-items:baseline;margin-bottom:8px;font-size:13.5px}.fhd a,.fgh a{color:var(--accent);cursor:pointer;font-size:12.5px}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 14px}
+.fgh{display:flex;gap:6px;align-items:baseline;font-size:12px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}.fgh span:first-child{color:var(--ink)}
+.ffind{width:100%;font-size:12.5px;padding:4px 7px;margin-bottom:4px}
+.flist{max-height:178px;overflow:auto;display:grid;gap:1px;padding-right:2px}
+.fit{display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;font-size:13px;padding:3px 4px;border-radius:4px;cursor:pointer}
+.fit:hover{background:var(--soft)}.fit input{margin:0}.fit em{font-style:normal;font-size:11.5px;color:var(--muted);font-family:"IBM Plex Mono",Consolas,monospace}
+.fit.dim{opacity:.45}.fit span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start}
 #lbody.has3d .lgrid{grid-template-columns:minmax(0,1fr) minmax(380px,560px)}
 #l3d{position:sticky;top:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:8px}
@@ -268,7 +277,7 @@ mark{background:var(--chk-bg);color:inherit;padding:0 1px;border-radius:2px;font
   <div id="lbody" class="srch hidden">
    <div class="lgrid">
     <div class="lcol">
-    <div class="facets" id="lfac"></div>
+    <div id="lfac"></div>
     <div class="stat" id="lcount"></div>
     <div id="ldym"></div>
     <div class="res" id="lres"></div>
@@ -615,7 +624,9 @@ async function resolveNames(root){if(!user||!user.profiles)return;const els=[...
 const V3D=!!window.CYB_LOCAL;if(V3D)$('tab3d').style.display='';
 const link3d=(F)=>V3D?`<a class="v3d" href="viewer/#op=${encodeURIComponent(OPS[F.si].id)}&f=${encodeURIComponent(F.f.id)}" title="Show where this is on the workpiece (3D)">📍 View on workpiece</a>`:'';
 function noOf(f){const m=/\d{3}/.exec(f.id)||/\d{3}/.exec(f.name);if(m)return m[0];if(/^KP\d/.test(f.id))return 'Knock pin '+f.id.slice(2);return f.name;}
-let LIDX=null,DOCS=[],LQ='',LF={m:'',face:'',work:''},LSHOW=20,sugI=-1,SUGS=[];
+const FFIND={};
+function newLF(){return {pn:new Set(),st:new Set(),face:new Set(),work:new Set()};}
+let LIDX=null,DOCS=[],LQ='',LF=newLF(),LSHOW=20,sugI=-1,SUGS=[];
 const norm=t=>String(t).toLowerCase().replace(/ø/g,'ø').replace(/cyb-?/g,'').replace(/\s+/g,' ').trim();
 function buildIdx(){LIDX={};Object.entries(FEAT).forEach(([k,F])=>{const n=noOf(F.f);(LIDX[n]=LIDX[n]||[]).push(k);});}
 function docs(){ // rebuilt per render so scenario moves are reflected
@@ -647,13 +658,28 @@ function renderLookup(){
   $('lex').innerHTML='';
   const t0=performance.now();const {toks,res}=search(LQ);
   // facets on the unfiltered result set
-  const cnt=(fn)=>{const o={};res.forEach(x=>fn(x.d).forEach(v=>o[v]=(o[v]||0)+1));return Object.entries(o).sort((a,b)=>b[1]-a[1]);};
-  const fm=cnt(d=>d.machines),ff=cnt(d=>d.faces),fw=cnt(d=>d.works);
-  const filt=res.filter(x=>(!LF.m||x.d.machines.includes(LF.m))&&(!LF.face||x.d.faces.includes(LF.face))&&(!LF.work||x.d.works.includes(LF.work)));
+  const cnt=(fn)=>{const o={};res.forEach(x=>fn(x.d).forEach(v=>o[v]=(o[v]||0)+1));return o;};
+  const cPn=cnt(d=>[d.n]),cSt=cnt(d=>d.stations),cFace=cnt(d=>d.faces),cWork=cnt(d=>d.works);
+  const pass=(d,skip)=>(skip==='pn'||!LF.pn.size||LF.pn.has(d.n))&&(skip==='st'||!LF.st.size||d.stations.some(v=>LF.st.has(v)))&&(skip==='face'||!LF.face.size||d.faces.some(v=>LF.face.has(v)))&&(skip==='work'||!LF.work.size||d.works.some(v=>LF.work.has(v)));
+  const filt=res.filter(x=>pass(x.d));
   const dt=(performance.now()-t0)/1000;
-  const chipRow=(lbl,key,arr,max)=>arr.length>1||LF[key]?`<span class="lb">${lbl}</span>`+`<span class="chip ${!LF[key]?'on':''}" data-f="${key}" data-v="">All</span>`+arr.slice(0,max).map(([v,c])=>`<span class="chip ${LF[key]===v?'on':''}" data-f="${key}" data-v="${esc(v)}">${esc(v)}<b>${c}</b></span>`).join('')+'<span style="width:100%"></span>':'';
-  $('lfac').innerHTML=res.length?chipRow('Machine','m',fm,8)+chipRow('Face','face',ff,6)+chipRow('Work','work',fw,8):'';
-  $('lfac').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{LF[c.dataset.f]=c.dataset.v;LSHOW=20;renderLookup();});
+  // checklist filters: process number, machine / station, face, work type
+  const sortNum=(a,b)=>{const na=/^\d/.test(a),nb=/^\d/.test(b);return na!==nb?(na?-1:1):a.localeCompare(b,undefined,{numeric:true});};
+  const stOrder=v=>OPS.findIndex(o=>o.id===v);
+  const groups=[
+    ['pn','Process no.',Object.keys(cPn).sort(sortNum),v=>esc(v),cPn],
+    ['st','Machine / station',Object.keys(cSt).sort((a,b)=>stOrder(a)-stOrder(b)),v=>{const o=OPS[stOrder(v)];return `<b class="mono">${esc(v)}</b> <span class="muted">${esc(o?o.machine:'')}</span>`;},cSt],
+    ['face','Face',Object.keys(cFace).sort(),v=>esc(v),cFace],
+    ['work','Work type',Object.keys(cWork).sort(),v=>esc(v),cWork]];
+  const nAct=Object.values(LF).reduce((a,x)=>a+x.size,0);
+  $('lfac').innerHTML=res.length?`<div class="fbox"><div class="fhd"><b>Filter</b>${nAct?`<span class="muted">${nAct} selected</span><a id="fclear">Clear all</a>`:'<span class="muted">tick to narrow the results</span>'}</div><div class="fgrid">`+
+    groups.map(([key,lbl,vals,fmt,c])=>`<div class="fgrp"><div class="fgh"><span>${lbl}</span><span class="muted">${vals.length}</span>${LF[key].size?`<a data-clr="${key}">clear</a>`:''}</div>${vals.length>6?`<input type="text" class="ffind" data-k="${key}" placeholder="Find ${lbl.toLowerCase()}…">`:''}<div class="flist" data-k="${key}">`+
+      vals.map(v=>{const avail=res.some(x=>pass(x.d,key)&&(key==='pn'?x.d.n===v:key==='st'?x.d.stations.includes(v):key==='face'?x.d.faces.includes(v):x.d.works.includes(v)));
+        return `<label class="fit${avail||LF[key].has(v)?'':' dim'}" title="${esc(key==='st'?v+' · '+((OPS[stOrder(v)]||{}).machine||''):v)}" data-v="${esc(v).toLowerCase()} ${key==='st'?esc((OPS[stOrder(v)]||{}).machine||'').toLowerCase():''}"><input type="checkbox" data-k="${key}" value="${esc(v)}" ${LF[key].has(v)?'checked':''}><span>${fmt(v)}</span><em>${c[v]}</em></label>`;}).join('')+`</div></div>`).join('')+`</div></div>`:'';
+  $('lfac').querySelectorAll('input[type=checkbox]').forEach(cb=>cb.onchange=()=>{const S=LF[cb.dataset.k];cb.checked?S.add(cb.value):S.delete(cb.value);LSHOW=20;renderLookup();});
+  $('lfac').querySelectorAll('[data-clr]').forEach(a=>a.onclick=()=>{LF[a.dataset.clr].clear();LSHOW=20;renderLookup();});
+  if($('fclear'))$('fclear').onclick=()=>{LF=newLF();LSHOW=20;renderLookup();};
+  $('lfac').querySelectorAll('.ffind').forEach(inp=>{inp.value=FFIND[inp.dataset.k]||'';const apply=()=>{const t=inp.value.trim().toLowerCase();FFIND[inp.dataset.k]=inp.value;$('lfac').querySelectorAll(`.flist[data-k="${inp.dataset.k}"] .fit`).forEach(l=>l.style.display=!t||l.dataset.v.includes(t)?'':'none');};apply();inp.oninput=apply;});
   const moved=Object.keys(cur.moves).length>0;
   $('lcount').textContent=`About ${filt.length} result${filt.length===1?'':'s'} (${dt.toFixed(3)} seconds)`+(moved?` · scenario "${cur.name}"`:'');
   // did you mean
@@ -667,7 +693,7 @@ function renderLookup(){
   $('ldym').innerHTML=dym;$('ldym').querySelectorAll('a').forEach(a=>a.onclick=()=>doSearch(a.dataset.q));
   const top=filt.length&&toks.length===1&&filt[0].d.fields.num===toks[0];
   $('lres').innerHTML=filt.slice(0,LSHOW).map((x,i)=>{const d=x.d;const open=top&&i===0;
-    const title=d.isNum?`Process ${d.n} · ${d.steps.map(s=>s.f.name.replace(/\s*\(?\s*\d{3}.*$/,'').trim()||s.f.name).filter((v,i,a)=>a.indexOf(v)===i).join(', ')}`:d.n;
+    const title=d.isNum?`Process ${d.n} · ${d.steps.map(s=>(s.f.name.replace(/\s*\(?\s*\d{3}.*$/,'').replace(/[\u2460-\u2473]/g,'').trim()||s.f.name)).filter((v,i,a)=>a.indexOf(v)===i).join(', ')}`:d.n;
     const snip=d.steps.map(s=>s.f.kind).filter((v,i,a)=>a.indexOf(v)===i).join(' · ');
     return `<div class="r${cur3d&&cur3d.n===d.n?' sel3d':''}" data-n="${esc(d.n)}"><div class="url">${hl(d.faces.join(', ')+' face',toks)} › ${d.steps.length} step${d.steps.length>1?'s':''}${d.steps.some(s=>s.moved)?' › moved in scenario':''}</div>
       <h4 data-i="${i}">${hl(title,toks)}</h4>${V3D?`<div style="margin:2px 0 6px"><button class="sm show3d" data-n="${esc(d.n)}">📍 Show on workpiece</button></div>`:''}
@@ -700,7 +726,7 @@ function show3d(n,j,user){
   document.querySelectorAll('#lres .r').forEach(r=>r.classList.toggle('sel3d',r.dataset.n===n));
   if(user&&innerWidth<=1020)$('l3d').scrollIntoView({behavior:'smooth',block:'start'});
 }
-function doSearch(q){q=String(q||'').trim();$('lq').value=q;LQ=q;LF={m:'',face:'',work:''};LSHOW=20;closeSug();if(q)addRecent(q);if(tab!=='lookup')go('lookup');renderLookup();window.scrollTo({top:0});}
+function doSearch(q){q=String(q||'').trim();$('lq').value=q;LQ=q;LF=newLF();for(const k in FFIND)delete FFIND[k];LSHOW=20;closeSug();if(q)addRecent(q);if(tab!=='lookup')go('lookup');renderLookup();window.scrollTo({top:0});}
 function suggestions(q){if(!LIDX)buildIdx();if(!DOCS.length)DOCS=docs();const out=[];const t=norm(q);
   if(!t){recent().forEach(r=>out.push({q:r,t:r,d:'Recent search',ty:'recent'}));return out.slice(0,6);}
   const {toks,res}=search(q);
