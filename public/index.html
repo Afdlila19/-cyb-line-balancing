@@ -184,12 +184,12 @@ mark{background:var(--chk-bg);color:inherit;padding:0 1px;border-radius:2px;font
 <div class="banner hidden" id="dbBanner"></div>
 
 <nav class="tabs" id="tabs">
-  <a href="#balance" data-t="balance">Line balance</a>
+  <a href="#lookup" data-t="lookup">Process search</a>
+  <a href="viewer/" id="tab3d" style="display:none">3D Process Viewer ↗</a>
   <a href="#rebalance" data-t="rebalance">Move work</a>
+  <a href="#balance" data-t="balance">Line balance</a>
   <a href="#operators" data-t="operators">Operators</a>
   <a href="#model" data-t="model">Takt &amp; time model</a>
-  <a href="#lookup" data-t="lookup">Process search</a>
-  <a href="viewer/" id="tab3d" style="display:none">3D process viewer ↗</a>
 </nav>
 
 <!-- LINE BALANCE -->
@@ -754,7 +754,7 @@ addEventListener('keydown',e=>{if(e.key==='/'&&tab==='lookup'&&document.activeEl
 
 // ---------- tabs ----------
 function go(t){if(location.hash!=='#'+t)location.hash=t;else{tab=t;showTab();}}
-function showTab(){const h=location.hash.slice(1);tab=['balance','rebalance','operators','model','lookup'].includes(h)?h:'balance';
+function showTab(){const h=location.hash.slice(1);tab=['balance','rebalance','operators','model','lookup'].includes(h)?h:(window.CYB_LOCAL?'lookup':'balance');
   document.querySelectorAll('#tabs a').forEach(a=>a.classList.toggle('on',a.dataset.t===tab));
   ['balance','rebalance','operators','model','lookup'].forEach(t=>$('v-'+t).classList.toggle('hidden',t!==tab));if(calc)render();}
 addEventListener('hashchange',showTab);
