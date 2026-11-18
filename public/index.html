@@ -134,6 +134,22 @@ mark{background:var(--chk-bg);color:inherit;padding:0 1px;border-radius:2px;font
 .stp .m{font:600 14px "IBM Plex Mono",Consolas,"Courier New",monospace}
 .stp .m small{display:block;font:400 12px "IBM Plex Sans",sans-serif;color:var(--muted)}
 .more{margin-top:14px}
+#lbody.has3d{max-width:1280px}
+.lgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start}
+#lbody.has3d .lgrid{grid-template-columns:minmax(0,1fr) minmax(380px,560px)}
+#l3d{position:sticky;top:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:8px}
+.l3hd{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.l3k{font-size:12px;color:var(--muted);letter-spacing:.04em}.l3t{font-weight:600;font-size:15px;margin-top:2px}
+.l3steps{display:flex;flex-wrap:wrap;gap:6px}
+.l3steps button{font-size:12.5px;padding:4px 10px;border-radius:14px}
+.l3steps button.on{background:#ff2d55;border-color:#ff2d55;color:#fff}
+.l3frame{position:relative;height:min(62vh,560px);min-height:300px;border-radius:6px;overflow:hidden;background:var(--soft)}
+.l3frame iframe{width:100%;height:100%;border:0;display:block}
+.l3wait{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:13px}
+.l3note{font-size:12px;color:var(--muted)}
+.r.sel3d{border-left:3px solid #ff2d55;padding-left:12px;margin-left:-15px}
+.r .show3d{margin-left:8px}
+@media (max-width:1020px){#lbody.has3d .lgrid{grid-template-columns:minmax(0,1fr)}#l3d{position:static;order:-1}.l3frame{height:46vh}}
 .v3d{display:inline-block;font-size:12px;font-weight:500;padding:2px 8px;border-radius:12px;border:1px solid #ff2d55;color:#d0103a;text-decoration:none;white-space:nowrap;margin-left:6px}.v3d:hover{background:#ff2d55;color:#fff}
 @media (prefers-color-scheme:dark){.v3d{color:#ff8aa0}}
 @media (max-width:600px){.stp{grid-template-columns:24px 1fr}.stp>div:last-child{grid-column:2}.brand{font-size:26px}}
@@ -250,10 +266,20 @@ mark{background:var(--chk-bg);color:inherit;padding:0 1px;border-radius:2px;font
     <div class="ex" id="lex"></div>
   </div>
   <div id="lbody" class="srch hidden">
+   <div class="lgrid">
+    <div class="lcol">
     <div class="facets" id="lfac"></div>
     <div class="stat" id="lcount"></div>
     <div id="ldym"></div>
     <div class="res" id="lres"></div>
+    </div>
+    <aside id="l3d" class="hidden" aria-label="Location on the workpiece">
+      <div class="l3hd"><div><div class="l3k">📍 Where it is on the workpiece</div><div class="l3t" id="l3t"></div></div><a id="l3full" class="v3d" href="viewer/" target="_blank" rel="noopener">Open full viewer ↗</a></div>
+      <div class="l3steps" id="l3steps"></div>
+      <div class="l3frame" id="l3frame"><div class="l3wait" id="l3wait">Loading the 3D model…</div></div>
+      <div class="l3note">Red = this process. Blue = machined in earlier stations. Drag to rotate, scroll to zoom.</div>
+    </aside>
+   </div>
   </div>
 </section>
 
@@ -614,7 +640,7 @@ function search(q){const toks=tokens(q);const D=DOCS;let res=toks.length?D.map(d
   res.sort((a,b)=>(b.s-a.s)||a.d.n.localeCompare(b.d.n,undefined,{numeric:true}));return {toks,res};}
 function renderLookup(){
   if(!LIDX)buildIdx();DOCS=docs();
-  const home=!LQ;$('srch').classList.toggle('home',home);$('lbody').classList.toggle('hidden',home);$('lclear').classList.toggle('hidden',!$('lq').value);
+  const home=!LQ;if(home&&$('l3d')){$('l3d').classList.add('hidden');$('lbody').classList.remove('has3d');}$('srch').classList.toggle('home',home);$('lbody').classList.toggle('hidden',home);$('lclear').classList.toggle('hidden',!$('lq').value);
   if(home){const ex=['553','351','Tap front','Ø6.8','Makino MJ-61','170','bore','140M-B'];const rc=recent();
     $('lex').innerHTML=(rc.length?`<span class="muted" style="font-size:12.5px;width:100%">Recent</span>`+rc.map(q=>`<span class="chip" data-q="${esc(q)}">${esc(q)}</span>`).join('')+`<span style="width:100%"></span>`:'')+`<span class="muted" style="font-size:12.5px;width:100%">Try</span>`+ex.map(q=>`<span class="chip" data-q="${esc(q)}">${esc(q)}</span>`).join('');
     $('lex').querySelectorAll('.chip').forEach(c=>c.onclick=()=>doSearch(c.dataset.q));return;}
@@ -641,16 +667,38 @@ function renderLookup(){
   $('ldym').innerHTML=dym;$('ldym').querySelectorAll('a').forEach(a=>a.onclick=()=>doSearch(a.dataset.q));
   const top=filt.length&&toks.length===1&&filt[0].d.fields.num===toks[0];
   $('lres').innerHTML=filt.slice(0,LSHOW).map((x,i)=>{const d=x.d;const open=top&&i===0;
-    const title=d.isNum?`Process ${d.n} · ${d.steps.map(s=>s.f.name.replace(/\s*\d{3}.*$/,'')||s.f.name).filter((v,i,a)=>a.indexOf(v)===i).join(', ')}`:d.n;
+    const title=d.isNum?`Process ${d.n} · ${d.steps.map(s=>s.f.name.replace(/\s*\(?\s*\d{3}.*$/,'').trim()||s.f.name).filter((v,i,a)=>a.indexOf(v)===i).join(', ')}`:d.n;
     const snip=d.steps.map(s=>s.f.kind).filter((v,i,a)=>a.indexOf(v)===i).join(' · ');
-    return `<div class="r"><div class="url">${hl(d.faces.join(', ')+' face',toks)} › ${d.steps.length} step${d.steps.length>1?'s':''}${d.steps.some(s=>s.moved)?' › moved in scenario':''}</div>
-      <h4 data-i="${i}">${hl(title,toks)}</h4>
+    return `<div class="r${cur3d&&cur3d.n===d.n?' sel3d':''}" data-n="${esc(d.n)}"><div class="url">${hl(d.faces.join(', ')+' face',toks)} › ${d.steps.length} step${d.steps.length>1?'s':''}${d.steps.some(s=>s.moved)?' › moved in scenario':''}</div>
+      <h4 data-i="${i}">${hl(title,toks)}</h4>${V3D?`<div style="margin:2px 0 6px"><button class="sm show3d" data-n="${esc(d.n)}">📍 Show on workpiece</button></div>`:''}
       <div class="sn">${hl(snip,toks)}</div>
       <div class="path">${d.steps.map((s,j)=>`${j?'<span class="arr">→</span>':''}<span class="pm" title="${esc(s.op.name)}">${hl(s.op.id,toks)} · ${hl(s.op.machine,toks)}</span>`).join('')}</div>
-      <div class="det ${open?'':'hidden'}" id="det${i}"><div class="steps">${d.steps.map((s,j)=>`<div class="stp"><span class="k">${j+1}</span><span class="m">${esc(s.op.id)}<small>${esc(s.op.machine)}</small></span><div><b>${hl(s.f.name,toks)}</b>${link3d(s.F)} ${s.moved?`<span class="tag m">moved from ${esc(OPS[s.F.si].id)}</span>`:''}<div style="font-size:13px">${hl(s.f.kind,toks)}</div><div class="muted" style="font-size:12.5px">${esc(FACE[s.f.axis]||s.f.axis)} face · ${hl(s.f.pos,toks)}${s.f.level&&s.f.level!==(FACE[s.f.axis]||'')+' face'?' · '+esc(s.f.level):''}</div></div></div>`).join('')}</div></div>
+      <div class="det ${open?'':'hidden'}" id="det${i}"><div class="steps">${d.steps.map((s,j)=>`<div class="stp"><span class="k">${j+1}</span><span class="m">${esc(s.op.id)}<small>${esc(s.op.machine)}</small></span><div><b>${hl(s.f.name,toks)}</b>${V3D?`<button class="sm v3d" style="padding:2px 8px" data-n="${esc(d.n)}" data-j="${j}">📍 This step</button>`:''} ${s.moved?`<span class="tag m">moved from ${esc(OPS[s.F.si].id)}</span>`:''}<div style="font-size:13px">${hl(s.f.kind,toks)}</div><div class="muted" style="font-size:12.5px">${esc(FACE[s.f.axis]||s.f.axis)} face · ${hl(s.f.pos,toks)}${s.f.level&&s.f.level!==(FACE[s.f.axis]||'')+' face'?' · '+esc(s.f.level):''}</div></div></div>`).join('')}</div></div>
     </div>`;}).join('')+(filt.length>LSHOW?`<div class="more"><button id="lmore">Show more results (${filt.length-LSHOW} left)</button></div>`:'');
   $('lres').querySelectorAll('h4').forEach(h=>h.onclick=()=>$('det'+h.dataset.i).classList.toggle('hidden'));
+  $('lres').querySelectorAll('.show3d').forEach(b=>b.onclick=()=>show3d(b.dataset.n,null,true));
+  $('lres').querySelectorAll('button.v3d').forEach(b=>b.onclick=()=>show3d(b.dataset.n,+b.dataset.j,true));
+  // 3D panel follows the search: keep the chosen process if still listed, else the top result
+  if(V3D){const shown=filt.slice(0,LSHOW).map(x=>x.d.n);
+    if(!shown.length){$('l3d').classList.add('hidden');$('lbody').classList.remove('has3d');}
+    else if(!cur3d||!shown.includes(cur3d.n))show3d(shown[0],null,false);else show3d(cur3d.n,cur3d.j,false);}
   if($('lmore'))$('lmore').onclick=()=>{LSHOW+=20;renderLookup();};
+}
+let cur3d=null,frame3d=null;
+function show3d(n,j,user){
+  const d=DOCS.find(x=>x.n===n);if(!d)return;
+  if(j==null||j<0||j>=d.steps.length)j=d.steps.length-1;           // default: last step = finished feature
+  cur3d={n,j};const st=d.steps[j],F=st.F;
+  const h=`#op=${encodeURIComponent(OPS[F.si].id)}&f=${encodeURIComponent(F.f.id)}&embed=1`;
+  $('lbody').classList.add('has3d');$('l3d').classList.remove('hidden');
+  if(!frame3d){frame3d=document.createElement('iframe');frame3d.title='3D location on the workpiece';frame3d.onload=()=>{const w=$('l3wait');if(w)w.remove();};frame3d.src='viewer/'+h;$('l3frame').appendChild(frame3d);}
+  else if(frame3d.contentWindow&&frame3d.contentWindow.location.hash!==h){try{frame3d.contentWindow.location.hash=h;}catch(_){frame3d.src='viewer/'+h;}}
+  $('l3t').textContent=(d.isNum?'Process '+d.n:d.n)+' · '+st.f.name.replace(/\s*\(?\s*\d{3}.*$/,'').trim()+' · '+(FACE[st.f.axis]||st.f.axis)+' face';
+  $('l3full').href='viewer/'+h.replace('&embed=1','');
+  $('l3steps').innerHTML=d.steps.length>1?d.steps.map((s,k)=>`<button class="${k===j?'on':''}" data-j="${k}">${k+1}. ${esc(OPS[s.F.si].id.replace('CYB-',''))} · ${esc(catOf(s.f))}</button>`).join(''):'';
+  $('l3steps').querySelectorAll('button').forEach(b=>b.onclick=()=>show3d(n,+b.dataset.j,true));
+  document.querySelectorAll('#lres .r').forEach(r=>r.classList.toggle('sel3d',r.dataset.n===n));
+  if(user&&innerWidth<=1020)$('l3d').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function doSearch(q){q=String(q||'').trim();$('lq').value=q;LQ=q;LF={m:'',face:'',work:''};LSHOW=20;closeSug();if(q)addRecent(q);if(tab!=='lookup')go('lookup');renderLookup();window.scrollTo({top:0});}
 function suggestions(q){if(!LIDX)buildIdx();if(!DOCS.length)DOCS=docs();const out=[];const t=norm(q);
