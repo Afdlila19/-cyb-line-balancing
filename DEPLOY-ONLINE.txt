@@ -1,0 +1,67 @@
+PUT CYB LINE BALANCING ONLINE (not on claude.ai)
+=================================================
+
+The same folder runs on your local network (see README.txt) or online. Online,
+always set a team password: the page holds your process data, and without
+CYB_PASSWORD anyone who finds the address could read it.
+
+Settings (environment variables)
+  CYB_PASSWORD   team login password. Required online. Everyone signs in once
+                 per browser and stays signed in for 30 days. Changing it signs
+                 everyone out.
+  CYB_PIN        optional second PIN needed to SAVE (view-only for the rest)
+  CYB_DATA_DIR   where shared data is stored; must be a persistent disk
+  PORT           set automatically by most hosts
+
+
+OPTION A - RENDER.COM (easiest, nothing to install)       about 10 minutes
+--------------------------------------------------------------------------
+Render gives you an https://....onrender.com address with HTTPS included.
+A persistent disk needs a paid instance type: on the free type the saved
+scenarios and time studies would be wiped on every restart.
+
+ 1. Create a free GitHub account (github.com) if you do not have one.
+ 2. Create a new PRIVATE repository, e.g. "cyb-line-balancing", and upload
+    everything in this folder (drag and drop on the repository page works).
+    Do not upload a data\ folder.
+ 3. Create an account at render.com and connect it to GitHub.
+ 4. In Render: New > Blueprint > choose the repository. Render reads
+    render.yaml and sets up the service in Singapore with a 1 GB disk.
+ 5. When asked, enter CYB_PASSWORD (and CYB_PIN if you want one).
+ 6. Wait for "Live", then open the address Render shows. Sign in with the
+    password. Process search: add  #lookup  to the address.
+ Render takes a snapshot of the disk every 24 hours.
+ To update the line data later: replace public/line.json in GitHub; Render
+ redeploys by itself and keeps the saved data.
+
+
+OPTION B - YOUR COMPANY SERVER OR ANY CLOUD VM WITH DOCKER
+----------------------------------------------------------
+  docker build -t cyb-balancing .
+  docker run -d --name cyb --restart unless-stopped -p 8080:8080 \
+      -v cyb-data:/data -e CYB_PASSWORD='choose-a-strong-one' cyb-balancing
+
+  Put it behind HTTPS before opening it to the internet, for example with
+  Caddy (caddyserver.com), whose whole config can be one line:
+      cyb.yourcompany.com { reverse_proxy localhost:8080 }
+  Back up the Docker volume "cyb-data" (it holds data/cyb_data.json).
+
+
+OPTION C - ANY HOST THAT RUNS PYTHON (Railway, Fly.io, a VPS, ...)
+------------------------------------------------------------------
+  Start command:   python server.py
+  Health check:    /healthz
+  Mount a persistent volume and set CYB_DATA_DIR to it, plus CYB_PASSWORD.
+
+
+Moving data from the local-network version
+  Stop both, copy data/cyb_data.json from the LAN PC into the online disk
+  (CYB_DATA_DIR), start again.
+
+Security notes
+  - Use a password of 12+ characters; share it only with the team.
+    After 8 wrong tries an address is locked out for 10 minutes.
+  - Always use the https:// address. Render does this for you; for option B
+    use Caddy or your company's reverse proxy.
+  - Check with your IT / information-security team before putting company
+    process data on an outside host.

@@ -1,0 +1,17 @@
+# Render Blueprint: New > Blueprint, pick this repository.
+services:
+  - type: web
+    name: cyb-line-balancing
+    runtime: docker
+    plan: starter            # a persistent disk needs a paid plan; free instances lose data on restart
+    region: singapore
+    healthCheckPath: /healthz
+    envVars:
+      - key: CYB_PASSWORD    # team login password (required online)
+        sync: false
+      - key: CYB_PIN         # optional: extra PIN needed to save
+        sync: false
+    disk:
+      name: cyb-data
+      mountPath: /data
+      sizeGB: 1
