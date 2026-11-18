@@ -60,6 +60,12 @@ tr.now td{background:var(--cut-soft);color:var(--cut-ink)}
 #focusBar{display:none;align-items:center;gap:10px;flex-wrap:wrap;background:#fde2e7;color:#7a0b22;border:1px solid #f3a6b6;border-radius:6px;padding:8px 12px;margin:0 0 10px;font-size:14px}
 #focusBar.on{display:flex}#focusBar b{font-size:15px}#focusBar button{font:inherit;font-size:13px;padding:4px 10px;border-radius:5px;border:1px solid #f3a6b6;background:#fff;color:#7a0b22;cursor:pointer}
 #ftab tr.focus td{background:#fde2e7!important;color:#7a0b22;font-weight:600}
+html.embed body{padding:0;background:transparent}html.embed .wrap{gap:0;max-width:none}
+html.embed header,html.embed .ops,html.embed .specs,html.embed .note,html.embed .two,html.embed #focusClear,html.embed #play,html.embed #reset,html.embed .legend{display:none!important}
+html.embed .layout{grid-template-columns:minmax(0,1fr);gap:0}html.embed .stage{gap:6px}
+html.embed #focusBar{display:none!important}
+html.embed #view{height:calc(100vh - 40px);min-height:220px;border-radius:6px}
+html.embed .bar{gap:4px}html.embed .bar .b{font-size:12px;padding:4px 8px}
 .fsw{display:inline-block;width:11px;height:11px;border-radius:2px;background:#ff2d55;vertical-align:-1px;margin-right:4px}
 @media (prefers-color-scheme:dark){#focusBar{background:#3d1520;color:#ffb3c1;border-color:#7a2a3c}#focusBar button{background:#1b2227;color:#ffb3c1;border-color:#7a2a3c}#ftab tr.focus td{background:#3d1520!important;color:#ffb3c1}}
 </style>
@@ -249,9 +255,10 @@ function zoomFocus(){if(focusFi<0)return;const f=OPS[cur].features[focusFi];cons
  let t=v[0];while(t-th>Math.PI)t-=2*Math.PI;while(th-t>Math.PI)t+=2*Math.PI;tth=t;tph=v[1];dist=Math.min(dist,1050);vb.forEach(o=>o.classList.remove('on'));}
 document.getElementById('focusZoom').onclick=zoomFocus;
 document.getElementById('focusClear').onclick=()=>{history.replaceState(null,'',location.pathname+'#op='+encodeURIComponent(OPS[cur].id));selectOp(cur);};
-function fromHash(){const h=new URLSearchParams(location.hash.slice(1));const id=h.get('op');const k=id?OPS.findIndex(o=>o.id===id):-1;
+function fromHash(){const h=new URLSearchParams(location.hash.slice(1));document.documentElement.classList.toggle('embed',h.get('embed')==='1');const id=h.get('op');const k=id?OPS.findIndex(o=>o.id===id):-1;
  if(k>=0)selectOp(k,h.get('f'));else selectOp(0);}
 addEventListener('hashchange',()=>{if(baseGeo)fromHash();});
+document.documentElement.classList.toggle('embed',new URLSearchParams(location.hash.slice(1)).get('embed')==='1');
 loadBase().then(()=>{hint.textContent='Drag to rotate · scroll or pinch to zoom';fromHash();}).catch(()=>{hint.textContent='The 3D model could not load. If this keeps happening, check that mesh.txt is in the public/viewer folder.';});
 </script>
 </body></html>
