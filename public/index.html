@@ -134,6 +134,8 @@ mark{background:var(--chk-bg);color:inherit;padding:0 1px;border-radius:2px;font
 .stp .m{font:600 14px "IBM Plex Mono",Consolas,"Courier New",monospace}
 .stp .m small{display:block;font:400 12px "IBM Plex Sans",sans-serif;color:var(--muted)}
 .more{margin-top:14px}
+.v3d{display:inline-block;font-size:12px;font-weight:500;padding:2px 8px;border-radius:12px;border:1px solid #ff2d55;color:#d0103a;text-decoration:none;white-space:nowrap;margin-left:6px}.v3d:hover{background:#ff2d55;color:#fff}
+@media (prefers-color-scheme:dark){.v3d{color:#ff8aa0}}
 @media (max-width:600px){.stp{grid-template-columns:24px 1fr}.stp>div:last-child{grid-column:2}.brand{font-size:26px}}
 </style>
 </head>
@@ -162,6 +164,7 @@ mark{background:var(--chk-bg);color:inherit;padding:0 1px;border-radius:2px;font
   <a href="#operators" data-t="operators">Operators</a>
   <a href="#model" data-t="model">Takt &amp; time model</a>
   <a href="#lookup" data-t="lookup">Process search</a>
+  <a href="viewer/" id="tab3d" style="display:none">3D process viewer ↗</a>
 </nav>
 
 <!-- LINE BALANCE -->
@@ -463,7 +466,7 @@ function renderRebalance(){
   let lastCat='';
   $('featTable').innerHTML=`<tr><td></td><td class="muted">Load, unload, clamp</td><td></td><td class="n">${f1(s.h)}</td></tr><tr><td></td><td class="muted">Tool changes (${s.cats2.size} types)</td><td></td><td class="n">${f1(s.tcS)}</td></tr>`+
    rows.map(({k,F})=>{const f=F.f,t=calc.featTime[k],src=calc.featSrc[k];const moved=F.si!==selStation;
-    return `<tr class="${selected.has(k)?'sel':''}"><td><input type="checkbox" data-k="${esc(k)}" ${selected.has(k)?'checked':''} ${f.locked?'disabled title="Locked"':''}></td><td><div>${esc(f.name)} ${moved?`<span class="tag m">from ${esc(OPS[F.si].id)}</span>`:''}${f.locked?' <span class="tag">datum</span>':''}</div><div class="muted" style="font-size:12px">${esc(f.kind)} · <span class="tag">${esc(catOf(f))}</span></div></td><td>${esc(FACE[f.axis]||f.axis)}</td><td class="n"><span class="edit" data-k="${esc(k)}" title="Enter a measured time">${f1(t)}</span>${src==='measured'?' <span class="tag s">measured</span>':''}</td></tr>`;}).join('');
+    return `<tr class="${selected.has(k)?'sel':''}"><td><input type="checkbox" data-k="${esc(k)}" ${selected.has(k)?'checked':''} ${f.locked?'disabled title="Locked"':''}></td><td><div>${esc(f.name)}${V3D?`<a class="v3d" href="viewer/#op=${encodeURIComponent(OPS[F.si].id)}&f=${encodeURIComponent(f.id)}" title="Show on workpiece">📍 3D</a>`:''} ${moved?`<span class="tag m">from ${esc(OPS[F.si].id)}</span>`:''}${f.locked?' <span class="tag">datum</span>':''}</div><div class="muted" style="font-size:12px">${esc(f.kind)} · <span class="tag">${esc(catOf(f))}</span></div></td><td>${esc(FACE[f.axis]||f.axis)}</td><td class="n"><span class="edit" data-k="${esc(k)}" title="Enter a measured time">${f1(t)}</span>${src==='measured'?' <span class="tag s">measured</span>':''}</td></tr>`;}).join('');
   $('featTable').querySelectorAll('input[type=checkbox]').forEach(c=>c.onchange=()=>{c.checked?selected.add(c.dataset.k):selected.delete(c.dataset.k);renderTargets();markSel();});
   $('featTable').querySelectorAll('.edit').forEach(e=>e.onclick=()=>editStudy(e.dataset.k));
   $('chkAll').checked=false;$('chkAll').onchange=()=>{rows.forEach(({k,F})=>{if(F.f.locked)return;$('chkAll').checked?selected.add(k):selected.delete(k);});render();};
@@ -583,6 +586,8 @@ async function resolveNames(root){if(!user||!user.profiles)return;const els=[...
   let ps={};try{if(ids.length)ps=await user.profiles(ids)||{};}catch(_){}els.forEach(e=>{e.textContent=(ps[e.dataset.uid]&&ps[e.dataset.uid].name)||'Someone';});}
 
 // ---------- lookup (search engine) ----------
+const V3D=!!window.CYB_LOCAL;if(V3D)$('tab3d').style.display='';
+const link3d=(F)=>V3D?`<a class="v3d" href="viewer/#op=${encodeURIComponent(OPS[F.si].id)}&f=${encodeURIComponent(F.f.id)}" title="Show where this is on the workpiece (3D)">📍 View on workpiece</a>`:'';
 function noOf(f){const m=/\d{3}/.exec(f.id)||/\d{3}/.exec(f.name);if(m)return m[0];if(/^KP\d/.test(f.id))return 'Knock pin '+f.id.slice(2);return f.name;}
 let LIDX=null,DOCS=[],LQ='',LF={m:'',face:'',work:''},LSHOW=20,sugI=-1,SUGS=[];
 const norm=t=>String(t).toLowerCase().replace(/ø/g,'ø').replace(/cyb-?/g,'').replace(/\s+/g,' ').trim();
@@ -642,7 +647,7 @@ function renderLookup(){
       <h4 data-i="${i}">${hl(title,toks)}</h4>
       <div class="sn">${hl(snip,toks)}</div>
       <div class="path">${d.steps.map((s,j)=>`${j?'<span class="arr">→</span>':''}<span class="pm" title="${esc(s.op.name)}">${hl(s.op.id,toks)} · ${hl(s.op.machine,toks)}</span>`).join('')}</div>
-      <div class="det ${open?'':'hidden'}" id="det${i}"><div class="steps">${d.steps.map((s,j)=>`<div class="stp"><span class="k">${j+1}</span><span class="m">${esc(s.op.id)}<small>${esc(s.op.machine)}</small></span><div><b>${hl(s.f.name,toks)}</b> ${s.moved?`<span class="tag m">moved from ${esc(OPS[s.F.si].id)}</span>`:''}<div style="font-size:13px">${hl(s.f.kind,toks)}</div><div class="muted" style="font-size:12.5px">${esc(FACE[s.f.axis]||s.f.axis)} face · ${hl(s.f.pos,toks)}${s.f.level&&s.f.level!==(FACE[s.f.axis]||'')+' face'?' · '+esc(s.f.level):''}</div></div></div>`).join('')}</div></div>
+      <div class="det ${open?'':'hidden'}" id="det${i}"><div class="steps">${d.steps.map((s,j)=>`<div class="stp"><span class="k">${j+1}</span><span class="m">${esc(s.op.id)}<small>${esc(s.op.machine)}</small></span><div><b>${hl(s.f.name,toks)}</b>${link3d(s.F)} ${s.moved?`<span class="tag m">moved from ${esc(OPS[s.F.si].id)}</span>`:''}<div style="font-size:13px">${hl(s.f.kind,toks)}</div><div class="muted" style="font-size:12.5px">${esc(FACE[s.f.axis]||s.f.axis)} face · ${hl(s.f.pos,toks)}${s.f.level&&s.f.level!==(FACE[s.f.axis]||'')+' face'?' · '+esc(s.f.level):''}</div></div></div>`).join('')}</div></div>
     </div>`;}).join('')+(filt.length>LSHOW?`<div class="more"><button id="lmore">Show more results (${filt.length-LSHOW} left)</button></div>`:'');
   $('lres').querySelectorAll('h4').forEach(h=>h.onclick=()=>$('det'+h.dataset.i).classList.toggle('hidden'));
   if($('lmore'))$('lmore').onclick=()=>{LSHOW+=20;renderLookup();};
@@ -687,7 +692,7 @@ async function boot(){
   OPS=LINE.ops;OPS.forEach((op,si)=>op.features.forEach((f,fi)=>{FEAT[keyOf(op.id,f.id)]={f,si,fi};}));
   Object.entries(FEAT).forEach(([k,F])=>(F.f.after||[]).forEach(p=>{(SUCC[p]=SUCC[p]||[]).push(k);}));
   const n=Object.keys(FEAT).length;
-  $('srcline').innerHTML=`DATA FROM <a href="${esc(LINE.source.url)}">${esc(LINE.source.title.toUpperCase())}</a> · ${OPS.length} STATIONS · ${n} FEATURES · EXTRACTED ${esc(LINE.source.extracted)}`;
+  $('srcline').innerHTML=`DATA FROM <a href="${window.CYB_LOCAL?'viewer/':esc(LINE.source.url)}">${esc(LINE.source.title.toUpperCase())}</a> · ${OPS.length} STATIONS · ${n} FEATURES · EXTRACTED ${esc(LINE.source.extracted)}`;
   selStation=0;showTab();render();
   // capabilities
   const T=setTimeout(()=>{if(!db)banner('Shared saving is not available in this view. You can still explore; changes stay on this screen.');},10000);
