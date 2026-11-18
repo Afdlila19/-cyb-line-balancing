@@ -1,0 +1,88 @@
+PUT CYB LINE BALANCING ONLINE FOR FREE (Cloudflare Pages + D1)
+===============================================================
+
+No cost and no payment card. You get an address like
+https://cyb-line-balancing.pages.dev with HTTPS and a team password.
+Shared data (scenarios, time studies, settings) is kept in a free
+Cloudflare D1 database.
+
+You need: the GitHub repository with these files, and a free Cloudflare account.
+
+
+STEP 1 - FILES IN GITHUB
+  The repository must have, at the top level:
+     functions\      (new - the login and data service)
+     public\         index.html, line.json, local-api.js
+     server.py, Dockerfile, render.yaml, README.txt ... (not used by Cloudflare)
+  If you already uploaded the earlier version, upload this whole folder again
+  (Add file > Upload files) so the functions folder and the new
+  public\local-api.js are included. Commit changes.
+
+STEP 2 - CLOUDFLARE ACCOUNT
+  Sign up free at dash.cloudflare.com (email + password, no card).
+
+STEP 3 - CREATE THE DATABASE
+  Left menu: Storage & databases > D1 SQL database > Create database.
+  Name: cyb-data   Location: leave automatic (or Asia-Pacific).  Create.
+  Nothing else to do here: the tables are created on first use.
+
+STEP 4 - CREATE THE PAGES PROJECT
+  Left menu: Workers & Pages > Create.
+  Choose the Pages option (if the screen offers a Worker first, look for
+  "Looking to deploy Pages? Get started", or the "Pages" tab).
+  Import an existing Git repository > connect GitHub > pick cyb-line-balancing.
+     Project name:            cyb-line-balancing  (becomes the web address)
+     Framework preset:        None
+     Build command:           (leave empty)
+     Build output directory:  public
+  Save and Deploy. The first deploy shows "Setup not finished" - that is expected.
+
+STEP 5 - CONNECT THE DATABASE AND SET THE PASSWORD
+  Open the project > Settings.
+  a) Bindings > Add > D1 database
+        Variable name:  DB          (exactly, capital letters)
+        D1 database:    cyb-data
+     Save.
+  b) Variables and Secrets > Add
+        Type: Secret   Name: CYB_PASSWORD   Value: your team password (12+ characters)
+     Optional:  Type: Secret   Name: CYB_PIN   Value: a PIN needed to SAVE
+     Save.
+
+STEP 6 - REDEPLOY
+  Deployments tab > on the latest deployment open the "..." menu >
+  Retry deployment. (Settings only take effect on a new deployment.)
+
+STEP 7 - USE IT
+  Open https://cyb-line-balancing.pages.dev (the address shown on the project).
+  Sign in with the team password. Everyone stays signed in for 30 days.
+  Process search:  add  #lookup  to the address.
+  Updates from other users appear within about 15 seconds.
+
+
+UPDATING THE LINE DATA
+  Replace public/line.json in GitHub. Cloudflare redeploys by itself in about
+  a minute. Saved scenarios and time studies stay in the database.
+
+BACKUP
+  While signed in, open  https://<your address>/api/export  and save the file.
+  It holds every scenario, time study and setting. D1 also keeps its own
+  point-in-time history (Time Travel) for recovery.
+
+FREE PLAN LIMITS (plenty for one line team)
+  - The login and data service run as Cloudflare Functions, which share the free
+    Workers allowance of 100,000 requests per day (resets 07:00 Thailand time).
+    The page checks for updates every 15 seconds and stops while its tab is
+    hidden, so 20 people working all shift use well under half of it.
+  - D1 has daily read/write limits on the free plan; this tool uses a tiny part.
+  - If a limit is ever reached, viewing and saving stop until 07:00 the next
+    morning (data is not lost). Upgrading would remove the limit, but should
+    not be needed.
+
+CHANGING THE PASSWORD
+  Settings > Variables and Secrets > edit CYB_PASSWORD > Retry deployment.
+  Everyone is signed out and must use the new password.
+
+SECURITY
+  Keep the GitHub repository Private. Share the address and password only with
+  the team. Check with your IT / information-security team before putting
+  company process data on an outside service.

@@ -2,7 +2,8 @@ CYB LINE BALANCING - LOCAL NETWORK VERSION
 ===========================================
 
 Want it online instead (a web address that works from anywhere)?
-See DEPLOY-ONLINE.txt. The same folder does both.
+Free:  see DEPLOY-FREE-CLOUDFLARE.txt (Cloudflare, no cost, no card).
+Paid hosts or your own server: see DEPLOY-ONLINE.txt. The same folder does all of these.
 
 One PC on the factory network runs the server. Everyone else opens the page in
 a web browser (Chrome or Edge, on a PC or tablet). No internet is needed.
