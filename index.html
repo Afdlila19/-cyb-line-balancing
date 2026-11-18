@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CYB Line Balancing</title>
+<style>
+:root{--bg:#eef1f3;--panel:#fff;--ink:#1c2328;--muted:#5b6770;--line:#d3d9de;--accent:#1f6f8b;--accent-ink:#fff;--soft:#e3e8ec;
+--mach:#16769e;--moved:#c2691a;--hand:#9aa5ad;--tc:#c9d0d5;--takt:#b3261e;--target:#1c2328;
+--ok:#2e7d32;--ok-bg:#e3f1e4;--chk:#8a5a00;--chk-bg:#fbefd2;--maj:#a24a00;--maj-bg:#fde2cc;--blk:#b3261e;--blk-bg:#f9dcd9;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#13181c;--panel:#1b2227;--ink:#e4e9ec;--muted:#95a2ab;--line:#2d373e;--accent:#4fa7c6;--accent-ink:#0b1418;--soft:#222b31;
+--mach:#2f97c9;--moved:#d07a22;--hand:#6b7780;--tc:#3d4850;--takt:#ef6b62;--target:#e4e9ec;
+--ok:#7cc47f;--ok-bg:#1d3320;--chk:#e5b453;--chk-bg:#3a2f14;--maj:#f0a04b;--maj-bg:#3e2813;--blk:#ef6b62;--blk-bg:#3d1c1a;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 "IBM Plex Sans","Segoe UI",Tahoma,system-ui,sans-serif;padding:20px 16px}
+.wrap{max-width:1280px;margin:0 auto;display:grid;gap:14px}
+.wrap>section{width:100%}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px}
+h1{font-size:20px;font-weight:600;margin:0}
+h2{font-size:12px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+h3{font-size:15px;font-weight:600;margin:0 0 6px}
+.mono,.sub,td.n,th.n{font-family:"IBM Plex Mono",Consolas,"Courier New",monospace}
+.sub{font-size:12px;color:var(--muted);letter-spacing:.03em}
+a{color:var(--accent)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,select,input{font:inherit;color:inherit}
+button{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 11px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--accent)}
+button.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+button.sm{padding:3px 8px;font-size:12.5px}
+select,input[type=number],input[type=text]{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+input[type=number]{width:90px;font-family:"IBM Plex Mono",Consolas,"Courier New",monospace}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tabs a{padding:8px 14px;text-decoration:none;color:var(--muted);border-bottom:2px solid transparent;font-weight:500}
+.tabs a.on{color:var(--ink);border-bottom-color:var(--accent)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.kpi .l{font-size:12px;color:var(--muted)}
+.kpi .v{font:500 24px "IBM Plex Mono",Consolas,"Courier New",monospace;margin-top:2px}
+.kpi .d{font-size:12px;color:var(--muted)}
+table{border-collapse:collapse;width:100%}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;font-weight:500;color:var(--muted);position:sticky;top:0;background:var(--panel)}
+td.n,th.n{text-align:right;white-space:nowrap}
+.tw{overflow:auto;max-height:560px}
+tr.sel td{background:var(--soft)}
+tr.clk{cursor:pointer}
+tr.clk:hover td{background:var(--soft)}
+.pill{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.p0{color:var(--ok);background:var(--ok-bg)}.p1{color:var(--chk);background:var(--chk-bg)}.p2{color:var(--maj);background:var(--maj-bg)}.p3{color:var(--blk);background:var(--blk-bg)}
+.tag{font-size:11px;padding:1px 6px;border-radius:4px;background:var(--soft);color:var(--muted);white-space:nowrap}
+.tag.m{color:var(--moved);border:1px solid currentColor;background:none}
+.tag.s{color:var(--ok);border:1px solid currentColor;background:none}
+.muted{color:var(--muted)}
+.note{font-size:13px;color:var(--muted);margin:6px 0 0}
+.grid2{display:grid;grid-template-columns:260px minmax(0,1fr);gap:14px;align-items:start}
+.grid3{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:980px){.grid2,.grid3{grid-template-columns:minmax(0,1fr)}}
+.stlist{display:grid;gap:4px;max-height:640px;overflow:auto}
+.st{display:grid;grid-template-columns:1fr auto;gap:2px 8px;text-align:left;padding:7px 9px}
+.st.on{border-color:var(--accent);background:var(--soft)}
+.st .nm{font-size:12px;color:var(--muted);grid-column:1/-1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st .mini{grid-column:1/-1;height:4px;background:var(--soft);border-radius:2px;position:relative}
+.st .mini i{position:absolute;left:0;top:0;bottom:0;background:var(--mach);border-radius:2px}
+.st .mini b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--takt)}
+.over{color:var(--blk);font-weight:600}
+#chart{width:100%;position:relative}
+#chart svg{display:block;width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted);margin-top:6px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.legend i.ln{height:0;border-top:2px dashed;border-radius:0;width:16px;vertical-align:3px}
+#tip{position:fixed;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:12.5px;box-shadow:0 4px 14px rgba(0,0,0,.15);display:none;z-index:20;max-width:300px}
+.reasons{margin:4px 0 0;padding-left:16px;font-size:12.5px;color:var(--muted)}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:8px 14px;border-radius:6px;font-size:13px;display:none;z-index:30}
+.banner{padding:8px 12px;border-radius:6px;background:var(--chk-bg);color:var(--chk);font-size:13px}
+.dirty{color:var(--moved);font-size:12.5px;font-weight:500}
+.sugg{display:grid;gap:6px}
+.sugg .row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:6px}
+.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 16px}
+.formgrid label{display:grid;gap:3px;font-size:12.5px;color:var(--muted)}
+td input[type=number]{width:74px;padding:3px 6px}
+.edit{cursor:pointer;border-bottom:1px dashed var(--muted)}
+dialog{border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);padding:16px;max-width:420px;width:92vw}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+.hidden{display:none!important}
+.srch{max-width:760px;margin:0 auto;width:100%}
+.srch.home{padding:9vh 0 4vh;text-align:center}
+.brand{font:600 34px "IBM Plex Sans",sans-serif;letter-spacing:-.01em;margin:0 0 4px}
+.brand span{color:var(--accent)}
+.tagline{color:var(--muted);margin:0 0 22px;font-size:14px}
+.srch:not(.home) .brand,.srch:not(.home) .tagline{display:none}
+.sbox{position:relative;text-align:left}
+.sbox .in{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:26px;padding:4px 6px 4px 18px;box-shadow:0 1px 6px rgba(0,0,0,.08)}
+.sbox .in:focus-within{border-color:var(--accent);box-shadow:0 2px 10px rgba(0,0,0,.12)}
+.sbox.open .in{border-radius:22px 22px 0 0;border-bottom-color:transparent}
+.sbox input{flex:1;border:0;outline:0;background:none;font-size:17px;padding:10px 0;min-width:0}
+.sbox .ic{color:var(--muted);flex:none}
+.sbox .x{border:0;background:none;color:var(--muted);font-size:20px;padding:4px 10px;line-height:1}
+.sbox .go{border-radius:20px;padding:8px 18px}
+.sugbox{position:absolute;left:0;right:0;top:100%;background:var(--panel);border:1px solid var(--accent);border-top:1px solid var(--line);border-radius:0 0 22px 22px;padding:6px 0 10px;z-index:15;box-shadow:0 8px 18px rgba(0,0,0,.14);display:none}
+.sbox.open .sugbox{display:block}
+.sg{display:flex;gap:12px;align-items:baseline;padding:7px 20px;cursor:pointer}
+.sg.on,.sg:hover{background:var(--soft)}
+.sg .t{font-weight:500;white-space:nowrap}
+.sg .d{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sg .ty{margin-left:auto;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;flex:none}
+.sghd{padding:6px 20px 2px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.ex{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:16px}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:4px 12px;font-size:13px;cursor:pointer}
+.chip:hover{border-color:var(--accent)}
+.chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.chip b{font-weight:500;color:var(--muted);margin-left:4px}
+.chip.on b{color:inherit;opacity:.8}
+.facets{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:12px 0 2px}
+.facets .lb{font-size:12px;color:var(--muted);margin-right:2px}
+.stat{font-size:13px;color:var(--muted);margin:10px 0 4px}
+.dym{font-size:15px;margin:8px 0}
+.dym a{font-weight:600;cursor:pointer}
+.res{display:grid;gap:22px;margin-top:10px;max-width:760px}
+.r .url{font:12.5px "IBM Plex Mono",Consolas,"Courier New",monospace;color:var(--muted)}
+.r h4{margin:2px 0 4px;font-size:19px;font-weight:500;color:var(--accent);cursor:pointer}
+.r h4:hover{text-decoration:underline}
+.r .sn{font-size:14px}
+.r .path{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:6px;font-size:13px}
+.r .path .arr{color:var(--muted)}
+.r .path .pm{padding:2px 8px;border-radius:4px;background:var(--soft);font-family:"IBM Plex Mono",Consolas,"Courier New",monospace;font-size:12.5px}
+.r .det{margin-top:8px}
+mark{background:var(--chk-bg);color:inherit;padding:0 1px;border-radius:2px;font-weight:600}
+.steps{display:grid;gap:6px}
+.stp{display:grid;grid-template-columns:28px 150px 1fr;gap:4px 10px;align-items:start;padding:8px 10px;border-radius:6px;background:var(--soft)}
+.stp .k{font:600 13px "IBM Plex Mono",Consolas,"Courier New",monospace;color:var(--muted)}
+.stp .m{font:600 14px "IBM Plex Mono",Consolas,"Courier New",monospace}
+.stp .m small{display:block;font:400 12px "IBM Plex Sans",sans-serif;color:var(--muted)}
+.more{margin-top:14px}
+.v3d{display:inline-block;font-size:12px;font-weight:500;padding:2px 8px;border-radius:12px;border:1px solid #ff2d55;color:#d0103a;text-decoration:none;white-space:nowrap;margin-left:6px}.v3d:hover{background:#ff2d55;color:#fff}
+@media (prefers-color-scheme:dark){.v3d{color:#ff8aa0}}
+@media (max-width:600px){.stp{grid-template-columns:24px 1fr}.stp>div:last-child{grid-column:2}.brand{font-size:26px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div><h1>CYB line balancing, 4JA1 cylinder body</h1>
+  <div class="sub" id="srcline">Loading line data…</div></div>
+  <div class="sub" id="who"></div>
+</header>
+
+<div class="panel bar" id="scenBar">
+  <span class="muted">Scenario</span>
+  <select id="scenSel" aria-label="Scenario"></select>
+  <span class="dirty hidden" id="dirty">● unsaved changes</span>
+  <span style="flex:1"></span>
+  <button id="btnSave">Save</button>
+  <button id="btnSaveAs">Save as new…</button>
+  <button id="btnDel">Delete</button>
+</div>
+<div class="banner hidden" id="dbBanner"></div>
+
+<nav class="tabs" id="tabs">
+  <a href="#balance" data-t="balance">Line balance</a>
+  <a href="#rebalance" data-t="rebalance">Move work</a>
+  <a href="#operators" data-t="operators">Operators</a>
+  <a href="#model" data-t="model">Takt &amp; time model</a>
+  <a href="#lookup" data-t="lookup">Process search</a>
+  <a href="viewer/" id="tab3d" style="display:none">3D process viewer ↗</a>
+</nav>
+
+<!-- LINE BALANCE -->
+<section id="v-balance" class="wrap" style="gap:14px">
+  <div class="kpis" id="kpis"></div>
+  <div class="panel">
+    <h2>Station cycle time vs takt (yamazumi)</h2>
+    <div id="chart"></div>
+    <div class="legend">
+      <span><i style="background:var(--hand)"></i>Load, unload, clamp</span>
+      <span><i style="background:var(--tc)"></i>Tool changes</span>
+      <span><i style="background:var(--mach)"></i>Machining (own work)</span>
+      <span><i style="background:var(--moved)"></i>Machining moved in</span>
+      <span><i class="ln" style="border-color:var(--takt)"></i>Takt</span>
+      <span><i class="ln" style="border-color:var(--target)"></i>Target cycle (takt × OEE)</span>
+    </div>
+    <p class="note">Click a bar to open that station in Move work. Baseline cycle times come from the process viewer; the split inside each bar is the time model (Takt &amp; time model tab).</p>
+  </div>
+  <div class="panel">
+    <h2>Stations</h2>
+    <div class="tw"><table><thead><tr><th>Station</th><th>Machine</th><th class="n">Baseline</th><th class="n">This scenario</th><th class="n">Change</th><th class="n">Gap to target</th><th class="n">Load vs takt</th><th class="n">Features</th></tr></thead><tbody id="stTable"></tbody></table></div>
+  </div>
+</section>
+
+<!-- REBALANCE -->
+<section id="v-rebalance" class="hidden">
+  <div class="grid2">
+    <div class="panel"><h2>Stations</h2><div class="stlist" id="stList"></div></div>
+    <div class="wrap" style="gap:14px">
+      <div class="panel">
+        <div class="bar" style="justify-content:space-between;margin-bottom:8px">
+          <div><h3 id="rbTitle"></h3><div class="sub" id="rbSub"></div></div>
+          <div class="bar"><button id="btnSuggest">Suggest moves off the bottleneck</button></div>
+        </div>
+        <div class="grid3">
+          <div>
+            <h2>Work on this station</h2>
+            <div class="bar" style="margin-bottom:6px"><label class="muted" style="font-size:12.5px"><input type="checkbox" id="chkAll"> Select all</label><span class="muted" style="font-size:12.5px" id="selInfo"></span></div>
+            <div class="tw" style="max-height:520px"><table><thead><tr><th></th><th>Feature</th><th>Face</th><th class="n">Time (s)</th></tr></thead><tbody id="featTable"></tbody></table></div>
+            <p class="note">Click a time to enter a measured time-study value. Measured times are shared with everyone and replace the estimate.</p>
+          </div>
+          <div>
+            <h2>Move selected work to</h2>
+            <div id="targets" class="sugg"><p class="muted">Select one or more features on the left.</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel hidden" id="suggPanel"><h2>Suggested moves</h2><div id="suggList" class="sugg"></div></div>
+      <div class="panel"><h2>Moves in this scenario</h2><div id="moveLog"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- OPERATORS -->
+<section id="v-operators" class="hidden wrap" style="gap:14px">
+  <div class="panel">
+    <div class="bar" style="justify-content:space-between"><h2 style="margin:0">Operator loading</h2>
+      <div class="bar"><span class="muted">Operators</span><input type="number" id="opCount" min="1" max="12" step="1"></div></div>
+    <p class="note">Each operator's cycle is the manual work at their stations plus walking. It has to fit inside takt, and no operator can run faster than the slowest machine they tend. Assignments and manual times are saved with the scenario.</p>
+    <div id="opChart" style="margin-top:10px"></div>
+    <div class="legend"><span><i style="background:var(--hand)"></i>Manual work at stations</span><span><i style="background:var(--tc)"></i>Walking</span><span><i class="ln" style="border-color:var(--takt)"></i>Takt</span><span><i class="ln" style="border-color:var(--target)"></i>Target cycle</span></div>
+  </div>
+  <div class="grid3">
+    <div class="panel"><h2>Stations</h2><div class="tw"><table><thead><tr><th>Station</th><th class="n">Machine CT (s)</th><th class="n">Manual (s)</th><th>Operator</th></tr></thead><tbody id="opTable"></tbody></table></div></div>
+    <div class="panel"><h2>Operators</h2><div class="tw"><table><thead><tr><th>Operator</th><th class="n">Manual</th><th class="n">Walk (s)</th><th class="n">Cycle</th><th class="n">Slowest machine</th><th class="n">vs takt</th></tr></thead><tbody id="opSum"></tbody></table></div></div>
+  </div>
+</section>
+
+<!-- LOOKUP -->
+<section id="v-lookup" class="hidden">
+  <div class="srch home" id="srch">
+    <h2 class="brand" style="text-transform:none;letter-spacing:-.01em;color:var(--ink)">CYB <span>process search</span></h2>
+    <p class="tagline">Find which machine processes any number on the 4JA1 cylinder body line</p>
+    <div class="sbox" id="sbox">
+      <div class="in">
+        <svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" id="lq" placeholder="Search a process no., machine, station or work…" autocomplete="off" spellcheck="false" aria-label="Search" role="combobox" aria-expanded="false" aria-controls="sugbox">
+        <button class="x hidden" id="lclear" aria-label="Clear">×</button>
+        <button class="pri go" id="lgo">Search</button>
+      </div>
+      <div class="sugbox" id="sugbox" role="listbox"></div>
+    </div>
+    <div class="ex" id="lex"></div>
+  </div>
+  <div id="lbody" class="srch hidden">
+    <div class="facets" id="lfac"></div>
+    <div class="stat" id="lcount"></div>
+    <div id="ldym"></div>
+    <div class="res" id="lres"></div>
+  </div>
+</section>
+
+<!-- MODEL -->
+<section id="v-model" class="hidden wrap" style="gap:14px">
+  <div class="panel">
+    <h2>Takt time (shared line settings)</h2>
+    <div class="formgrid">
+      <label>Demand (blocks per day)<input type="number" id="cDemand" min="1"></label>
+      <label>Shifts per day<input type="number" id="cShifts" min="1" max="3"></label>
+      <label>Net working minutes per shift<input type="number" id="cMin" min="1"></label>
+      <label>Target OEE (%)<input type="number" id="cOee" min="1" max="100"></label>
+    </div>
+    <p class="note" id="taktCalc"></p>
+  </div>
+  <div class="panel">
+    <h2>Station times (shared)</h2>
+    <p class="note" style="margin:0 0 8px">Cycle time is from the process viewer unless overridden here. Handling is the non-cutting part of each cycle (load, clamp, unclamp, unload). The rest of the cycle is shared across the features by the standard times below, then replaced by any measured times.</p>
+    <div class="tw"><table><thead><tr><th>Station</th><th>Machine</th><th class="n">Viewer CT (min)</th><th class="n">Override CT (min)</th><th class="n">Handling (s)</th><th class="n">Model fit</th></tr></thead><tbody id="ctTable"></tbody></table></div>
+  </div>
+  <div class="grid3">
+    <div class="panel">
+      <h2>Standard times by work type (shared)</h2>
+      <div class="tw"><table><thead><tr><th>Work type</th><th class="n">Seconds</th><th class="n">Count on line</th></tr></thead><tbody id="catTable"></tbody></table></div>
+      <div class="bar" style="margin-top:10px"><span class="muted">Tool change (s per tool type)</span><input type="number" id="cTc" min="0" step="0.5"><span class="muted">Drill: + s per mm depth</span><input type="number" id="cDrillMm" min="0" step="0.01"></div>
+    </div>
+    <div class="panel">
+      <h2>Measured time studies</h2>
+      <div class="tw" style="max-height:420px"><table><thead><tr><th>Feature</th><th class="n">Seconds</th><th>By</th><th></th></tr></thead><tbody id="studyTable"></tbody></table></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>How moves are checked</h2>
+    <ul class="reasons" style="font-size:13.5px">
+      <li><span class="pill p3">Blocked</span> the datum knock pin holes in CYB-10M; anything that would run before work it depends on (rough before finish, drill before tap or counterbore, spot face before the hole in it, the same callout in an earlier station).</li>
+      <li><span class="pill p2">Major</span> into a special-purpose machine (SPM) or CYB-10M (located on the raw casting); a face the target machine does not reach today and cannot index to.</li>
+      <li><span class="pill p1">Check</span> a face the target does not cut today but may reach by indexing; a new tool type for the target's magazine; tight tolerances that need capability re-proven; taking work off an SPM head.</li>
+      <li><span class="pill p0">OK</span> same face, tool type already in the target, order respected. Still confirm with the process engineer before changing a program.</li>
+    </ul>
+  </div>
+</section>
+</div>
+<div id="tip"></div>
+<div class="toast" id="toast"></div>
+<dialog id="dlg"><form method="dialog" id="dlgForm"><h3 id="dlgTitle"></h3><div id="dlgBody"></div><div class="bar" style="justify-content:flex-end;margin-top:12px"><button value="cancel" type="button" id="dlgCancel">Cancel</button><button class="pri" value="ok" id="dlgOk">OK</button></div></form></dialog>
+
+<script src="local-api.js"></script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const f1=x=>(Math.round(x*10)/10).toFixed(1), f2=x=>(Math.round(x*100)/100).toFixed(2);
+const FACE={'z+':'Top','z-':'Bottom','x+':'Front','x-':'Rear','y+':'Left','y-':'Right'};
+const LEVEL=['OK','Check','Major','Blocked'];
+
+// ---------- defaults ----------
+const DEF_CAT=[ // order = classification priority
+ ['Broach',/broach/i,10],['Tap',/^tap/i,6],['Ream',/^ream/i,6],['Counterbore',/^counterbore/i,4],
+ ['Drill',/^drill/i,3],['Chamfer',/^chamfer|^90° chamfer/i,3],['Bore',/bore/i,20],['Face mill',/face mill/i,45],
+ ['Side mill',/side mill/i,15],['Face pad',/face pad/i,8],['Spot face',/spot.?face/i,5],['Notch',/notch/i,6],['Other',/./,5]];
+const DEFAULT_CFG={demand:250,shifts:2,minPerShift:450,oee:85,toolChange:6,drillPerMm:0.12,handling:{},ctOverride:{},cat:Object.fromEntries(DEF_CAT.map(c=>[c[0],c[2]]))};
+
+// ---------- state ----------
+let LINE=null, OPS=[], FEAT={}, SUCC={};
+let CFG=JSON.parse(JSON.stringify(DEFAULT_CFG));
+let STUDIES={};           // key -> {sec,by,at}
+let SCENS={};             // id -> doc
+let cur={id:'',name:'Baseline',moves:{},opr:null}; let dirty=false;
+let selStation=0, selected=new Set(), tab='balance';
+let db=null, user=null, myId=null, canWrite=false;
+let calc=null;
+
+const keyOf=(op,f)=>op+'|'+f;
+const safeId=k=>k.replace(/[^A-Za-z0-9_-]/g,c=>'~'+c.codePointAt(0).toString(16));
+function catOf(f){for(const c of DEF_CAT){if(c[1].test(f.kind))return c[0];}return 'Other';}
+function weightOf(f){const c=catOf(f);let w=CFG.cat[c]??5;if(c==='Drill'){const m=/↓\s*([\d.]+)/.exec(f.kind);const d=f.depth||(m?parseFloat(m[1]):10);w+=d*CFG.drillPerMm;}return Math.max(0.1,w);}
+function handlingOf(op){return CFG.handling[op.id]??30;}
+function ctOf(op){const o=CFG.ctOverride[op.id];return (o>0?o:op.ct)||null;}
+
+// ---------- compute ----------
+function compute(){
+  // baseline calibration per station
+  const st=OPS.map((op,i)=>{
+    const cats=new Set(op.features.map(catOf));
+    const h=handlingOf(op), tc=cats.size*CFG.toolChange;
+    let meas=0,wsum=0;
+    op.features.forEach(f=>{const s=STUDIES[keyOf(op.id,f.id)];if(s)meas+=s.sec;else wsum+=weightOf(f);});
+    const ct=ctOf(op); let k=1, est=!ct;
+    if(ct){k=wsum>0?Math.max(0,(ct*60-h-tc-meas))/wsum:1;}
+    return {i,op,cats,h,ct,k,est,fit:ct?(wsum>0?k:null):null};
+  });
+  const fits=st.filter(s=>s.fit!=null).map(s=>s.fit).sort((a,b)=>a-b);const medK=fits.length?fits[Math.floor(fits.length/2)]:1;
+  st.forEach(s=>{if(s.est)s.k=medK;});
+  const featTime={}, featSrc={};
+  st.forEach(s=>s.op.features.forEach(f=>{const key=keyOf(s.op.id,f.id);const m=STUDIES[key];
+    if(m){featTime[key]=m.sec;featSrc[key]='measured';}else{featTime[key]=weightOf(f)*s.k;featSrc[key]=s.est?'estimate (no CT)':'estimate';}}));
+  // scenario assignment
+  const where={};OPS.forEach((op,i)=>op.features.forEach(f=>{const key=keyOf(op.id,f.id);const t=cur.moves[key];where[key]=t!=null&&idxOf(t)>=0?idxOf(t):i;}));
+  const stations=st.map(s=>({...s,own:0,inn:0,items:[],cats2:new Set()}));
+  Object.keys(where).forEach(key=>{const j=where[key];const S=stations[j];const F=FEAT[key];S.items.push(key);S.cats2.add(catOf(F.f));if(F.si===j)S.own+=featTime[key];else S.inn+=featTime[key];});
+  stations.forEach(S=>{S.tcS=S.cats2.size*CFG.toolChange;S.total=S.h+S.tcS+S.own+S.inn;S.base=S.ct?S.ct*60:(S.h+S.cats.size*CFG.toolChange+S.op.features.reduce((a,f)=>a+featTime[keyOf(S.op.id,f.id)],0));});
+  const avail=CFG.shifts*CFG.minPerShift*60, takt=avail/Math.max(1,CFG.demand), target=takt*CFG.oee/100;
+  calc={stations,featTime,featSrc,where,takt,target,avail};
+  return calc;
+}
+function idxOf(opId){return OPS.findIndex(o=>o.id===opId);}
+function kpi(stations){const ss=stations.filter(s=>!s.est);const t=ss.map(s=>s.total);const mx=Math.max(...t);const b=ss[t.indexOf(mx)];const sum=t.reduce((a,b)=>a+b,0);
+  return {mx,b,eff:sum/(t.length*mx),n:ss.length,miss:stations.filter(s=>s.est).map(s=>s.op.id),over:ss.filter(s=>s.total>calc.target+1e-6).length,overT:ss.filter(s=>s.total>calc.takt+1e-6).length};}
+
+// ---------- move checks ----------
+function check(key,ti,C,excl){
+  C=C||calc;excl=excl||new Set([key]);const F=FEAT[key],f=F.f,tgt=OPS[ti],src=OPS[F.si];const r=[];let lv=0;
+  const tItems=calc.stations[ti].items.filter(k=>!excl.has(k));
+  const up=(l,t)=>{r.push([l,t]);lv=Math.max(lv,l);};
+  if(f.locked)up(3,f.locked);
+  (f.after||[]).forEach(p=>{if(!FEAT[p])return;const pj=C.where[p];if(pj>ti)up(3,`Must run after ${FEAT[p].f.name} (${p.split('|')[0]}), which is now in ${OPS[pj].id}`);});
+  (SUCC[key]||[]).forEach(s=>{const sj=C.where[s];if(sj<ti)up(3,`${FEAT[s].f.name} in ${OPS[sj].id} depends on this; it would run first`);});
+  if(/SPM/i.test(tgt.machine))up(2,`${tgt.machine} is special-purpose: adding work means a spindle head change`);
+  if(ti===0)up(2,'CYB-10M locates on the raw casting, before the datum holes exist');
+  const axes=new Set();tItems.forEach(k=>axes.add(FEAT[k].f.axis));
+  if(axes.size&&!axes.has(f.axis)){if(axes.size>=2&&!/SPM/i.test(tgt.machine))up(1,`${tgt.id} does not cut the ${FACE[f.axis]||f.axis} face today; confirm it can index to it and the fixture leaves it open`);else up(2,`${tgt.id} only reaches the ${[...axes].map(a=>FACE[a]||a).join(', ')} face; the ${FACE[f.axis]||f.axis} face needs a re-fixture`);}
+  const cat=catOf(f);if(!tItems.some(k=>catOf(FEAT[k].f)===cat))up(1,`New tool type (${cat}) in ${tgt.id}: check a free magazine pocket, adds ${CFG.toolChange}s tool change`);
+  if(/±0\.0|[+−-]0\.0[0-9]/.test(f.kind+' '+f.pos))up(1,'Tight tolerance: re-prove capability (Cpk) on the new machine');
+  if(/SPM/i.test(src.machine)&&ti!==F.si)up(1,`Taking it off the ${src.machine} head needs a head modification`);
+  return {lv,r};
+}
+// simulate moving set of keys to ti, return new station totals
+function simulate(keys,ti){
+  const save=cur.moves;cur.moves=Object.assign({},save);keys.forEach(k=>{if(FEAT[k].si===ti)delete cur.moves[k];else cur.moves[k]=OPS[ti].id;});
+  const C=compute();cur.moves=save;return C;}
+function checkSet(keys,ti){let lv=0;const r=[];const seen=new Set();
+  // treat set as moving together: check precedence against simulated placement
+  const C=simulate(keys,ti);compute();
+  const ex=new Set(keys);keys.forEach(k=>{const c=check(k,ti,C,ex);lv=Math.max(lv,c.lv);c.r.forEach(x=>{const t=x[1];if(!seen.has(t)){seen.add(t);r.push(x);}});});
+  r.sort((a,b)=>b[0]-a[0]);return {lv,r,C};}
+
+// ---------- rendering ----------
+function render(){
+  compute();
+  $('dirty').classList.toggle('hidden',!dirty);
+  renderScenSel();
+  if(tab==='balance')renderBalance();
+  if(tab==='rebalance')renderRebalance();
+  if(tab==='operators')renderOperators();
+  if(tab==='model')renderModel();
+  if(tab==='lookup')renderLookup();
+}
+function fmtS(s){return f1(s)+' s';}
+function fmtM(s){return f2(s/60)+' min';}
+
+function renderBalance(){
+  const S=calc.stations,K=kpi(S),B=kpi(S.map(s=>({...s,total:s.base})));
+  const perDay=calc.avail/K.mx*CFG.oee/100;
+  $('kpis').innerHTML=[
+    ['Takt time',fmtM(calc.takt),`${f1(calc.takt)} s · target cycle ${f1(calc.target)} s at ${CFG.oee}% OEE`],
+    ['Bottleneck',K.b.op.id,`${f1(K.mx)} s (${fmtM(K.mx)})${Object.keys(cur.moves).length?` · baseline ${B.b.op.id} ${f1(B.mx)} s`:''}`],
+    ['Line output',Math.floor(perDay)+' /day',`at ${CFG.oee}% OEE vs demand ${CFG.demand}`],
+    ['Balance efficiency',Math.round(K.eff*100)+'%',`baseline ${Math.round(B.eff*100)}% · sum of cycles ÷ (stations × bottleneck)`],
+    ['Stations over target',String(K.over),`${K.overT} over takt`+(K.miss.length?` · ${K.miss.join(', ')} left out until its CT is entered`:'')]
+  ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${esc(k[1])}</div><div class="d">${esc(k[2])}</div></div>`).join('');
+  drawYama($('chart'),S.map(s=>({label:s.op.id.replace('CYB-',''),full:s.op.id,sub:s.op.machine,segs:[['hand',s.h,'Load/unload'],['tc',s.tcS,'Tool changes'],['mach',s.own,'Machining'],['moved',s.inn,'Moved in']],total:s.total,base:s.base,est:s.est,i:s.i})),i=>{selStation=i;selected.clear();go('rebalance');});
+  $('stTable').innerHTML=S.map(s=>{const d=s.total-s.base,g=s.total-calc.target;return `<tr class="clk" data-i="${s.i}"><td><b>${esc(s.op.id)}</b><div class="muted" style="font-size:12px">${esc(s.op.name)}</div></td><td>${esc(s.op.machine)}</td><td class="n">${f1(s.base)} s${s.est?' <span class="tag">est.</span>':''}</td><td class="n">${f1(s.total)} s</td><td class="n">${Math.abs(d)<0.05?'–':(d>0?'+':'')+f1(d)}</td><td class="n ${g>0?'over':''}">${g>0?'+':''}${f1(g)} s</td><td class="n ${s.total>calc.takt?'over':''}">${Math.round(s.total/calc.takt*100)}%</td><td class="n">${s.items.length}</td></tr>`;}).join('');
+  $('stTable').querySelectorAll('tr').forEach(tr=>tr.onclick=()=>{selStation=+tr.dataset.i;selected.clear();go('rebalance');});
+}
+
+function drawYama(el,bars,onClick,opts){
+  opts=opts||{};
+  const W=Math.max(560,el.clientWidth||900),H=opts.h||340,ml=48,mr=16,mt=16,mb=opts.mb||46;
+  const vmax=Math.max(calc.takt,...bars.filter(b=>!b.est).map(b=>Math.max(b.total,b.base||0)))*1.12;
+  const pw=W-ml-mr,ph=H-mt-mb,bw=pw/bars.length,gap=Math.min(14,bw*.28),y=v=>mt+ph-(v/vmax)*ph;
+  const step=vmax>240?60:vmax>120?30:vmax>60?15:10;
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Stacked cycle time per station against takt">`;
+  for(let v=0;v<=vmax;v+=step){s+=`<line x1="${ml}" x2="${W-mr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${ml-6}" y="${y(v)+4}" font-size="11" text-anchor="end" fill="var(--muted)" font-family="IBM Plex Mono">${v}</text>`;}
+  s+=`<text x="12" y="${mt+ph/2}" font-size="11" fill="var(--muted)" transform="rotate(-90 12 ${mt+ph/2})" text-anchor="middle">seconds</text>`;
+  const col={hand:'var(--hand)',tc:'var(--tc)',mach:'var(--mach)',moved:'var(--moved)',walk:'var(--tc)'};
+  bars.forEach((b,i)=>{const x=ml+i*bw+gap/2,w=bw-gap;let acc=0;const segs=b.segs.filter(g=>g[1]>0.01);const clip=b.total>vmax;if(b.est)s+=`<g opacity="0.45">`;
+    if(clip){let rem=vmax*0.97;segs.forEach(g=>{g[1]=Math.max(0,Math.min(g[1],rem));rem-=g[1];});}
+    segs.forEach((g,j)=>{const y0=y(acc),y1=y(acc+g[1]);const top=j===segs.length-1;const hgt=Math.max(0,y0-y1-(j?2:0));
+      if(top&&hgt>4){const r=Math.min(4,w/2);s+=`<path d="M${x},${y0-(j?2:0)} V${y1+r} Q${x},${y1} ${x+r},${y1} H${x+w-r} Q${x+w},${y1} ${x+w},${y1+r} V${y0-(j?2:0)} Z" fill="${col[g[0]]}"/>`;}
+      else s+=`<rect x="${x}" y="${y1}" width="${w}" height="${hgt}" fill="${col[g[0]]}"/>`;acc+=g[1];});
+    if(b.est)s+=`</g>`;
+    if(b.base&&Math.abs(b.base-b.total)>0.05&&b.base<vmax)s+=`<line x1="${x-2}" x2="${x+w+2}" y1="${y(b.base)}" y2="${y(b.base)}" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="2 2"/>`;
+    const over=b.total>calc.takt;
+    s+=`<text x="${x+w/2}" y="${y(Math.min(b.total,vmax*0.97))-5}" font-size="10.5" text-anchor="middle" fill="${over?'var(--blk)':'var(--muted)'}" font-family="IBM Plex Mono" font-weight="${over?600:400}">${clip?'↑':''}${Math.round(b.total)}</text>`;
+    s+=`<text x="${x+w/2}" y="${H-mb+15}" font-size="11" text-anchor="middle" fill="var(--ink)" font-family="IBM Plex Mono">${esc(b.label)}</text>`;
+    if(b.est)s+=`<text x="${x+w/2}" y="${H-mb+28}" font-size="10" text-anchor="middle" fill="var(--muted)">no CT</text>`;
+    s+=`<rect class="hit" data-i="${i}" x="${ml+i*bw}" y="${mt}" width="${bw}" height="${ph+mb}" fill="transparent" style="cursor:${onClick?'pointer':'default'}"/>`;});
+  [[calc.takt,'var(--takt)','Takt '+Math.round(calc.takt)+' s'],[calc.target,'var(--target)','Target '+Math.round(calc.target)+' s']].forEach(([v,c,t],j)=>{
+    s+=`<line x1="${ml}" x2="${W-mr}" y1="${y(v)}" y2="${y(v)}" stroke="${c}" stroke-width="2" stroke-dasharray="6 4"/><text x="${W-mr-4}" y="${y(v)-5}" font-size="11" text-anchor="end" fill="${c}" font-weight="600" paint-order="stroke" stroke="var(--panel)" stroke-width="3">${t}</text>`;});
+  s+=`<line x1="${ml}" x2="${W-mr}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)"/></svg>`;
+  el.innerHTML=s;
+  const tip=$('tip');
+  el.querySelectorAll('.hit').forEach(h=>{const b=bars[+h.dataset.i];
+    h.onmousemove=e=>{tip.style.display='block';tip.style.left=Math.min(innerWidth-310,e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';
+      tip.innerHTML=`<b>${esc(b.full)}</b> <span class="muted">${esc(b.sub||'')}</span><br>`+b.segs.filter(g=>g[1]>0.01).map(g=>`${esc(g[2])}: <span class="mono">${f1(g[1])} s</span>`).join('<br>')+`<br><b>Total: <span class="mono">${f1(b.total)} s</span></b>`+(b.base&&Math.abs(b.base-b.total)>0.05?`<br><span class="muted">Baseline ${f1(b.base)} s</span>`:'')+`<br><span class="muted">${Math.round(b.total/calc.takt*100)}% of takt</span>`+(b.est?`<br><span class="muted">No cycle time in the viewer: estimated from standard times. Enter the real CT in Takt &amp; time model.</span>`:'');};
+    h.onmouseleave=()=>tip.style.display='none';
+    if(onClick)h.onclick=()=>{tip.style.display='none';onClick(b.i??+h.dataset.i);};});
+}
+
+function renderRebalance(){
+  const S=calc.stations,K=kpi(S);
+  $('stList').innerHTML=S.map(s=>`<button class="st ${s.i===selStation?'on':''}" data-i="${s.i}"><b class="mono">${esc(s.op.id)}</b><span class="mono ${s.total>calc.takt?'over':''}">${f1(s.total)} s</span><span class="nm">${esc(s.op.machine)}${s===K.b?' · bottleneck':''}</span><span class="mini"><i style="width:${Math.min(100,s.total/(calc.takt*1.25)*100)}%"></i><b style="left:${100/1.25}%"></b></span></button>`).join('');
+  $('stList').querySelectorAll('.st').forEach(b=>b.onclick=()=>{selStation=+b.dataset.i;selected.clear();render();});
+  const s=S[selStation];
+  $('rbTitle').textContent=`${s.op.id} · ${s.op.name}`;
+  $('rbSub').innerHTML=`${esc(s.op.machine)} · cycle ${f1(s.total)} s (baseline ${f1(s.base)} s) · takt ${f1(calc.takt)} s · target ${f1(calc.target)} s`;
+  const rows=s.items.map(k=>({k,F:FEAT[k]})).sort((a,b)=>(a.F.si-b.F.si)||(a.F.fi-b.F.fi));
+  [...selected].forEach(k=>{if(!s.items.includes(k))selected.delete(k);});
+  let lastCat='';
+  $('featTable').innerHTML=`<tr><td></td><td class="muted">Load, unload, clamp</td><td></td><td class="n">${f1(s.h)}</td></tr><tr><td></td><td class="muted">Tool changes (${s.cats2.size} types)</td><td></td><td class="n">${f1(s.tcS)}</td></tr>`+
+   rows.map(({k,F})=>{const f=F.f,t=calc.featTime[k],src=calc.featSrc[k];const moved=F.si!==selStation;
+    return `<tr class="${selected.has(k)?'sel':''}"><td><input type="checkbox" data-k="${esc(k)}" ${selected.has(k)?'checked':''} ${f.locked?'disabled title="Locked"':''}></td><td><div>${esc(f.name)}${V3D?`<a class="v3d" href="viewer/#op=${encodeURIComponent(OPS[F.si].id)}&f=${encodeURIComponent(f.id)}" title="Show on workpiece">📍 3D</a>`:''} ${moved?`<span class="tag m">from ${esc(OPS[F.si].id)}</span>`:''}${f.locked?' <span class="tag">datum</span>':''}</div><div class="muted" style="font-size:12px">${esc(f.kind)} · <span class="tag">${esc(catOf(f))}</span></div></td><td>${esc(FACE[f.axis]||f.axis)}</td><td class="n"><span class="edit" data-k="${esc(k)}" title="Enter a measured time">${f1(t)}</span>${src==='measured'?' <span class="tag s">measured</span>':''}</td></tr>`;}).join('');
+  $('featTable').querySelectorAll('input[type=checkbox]').forEach(c=>c.onchange=()=>{c.checked?selected.add(c.dataset.k):selected.delete(c.dataset.k);renderTargets();markSel();});
+  $('featTable').querySelectorAll('.edit').forEach(e=>e.onclick=()=>editStudy(e.dataset.k));
+  $('chkAll').checked=false;$('chkAll').onchange=()=>{rows.forEach(({k,F})=>{if(F.f.locked)return;$('chkAll').checked?selected.add(k):selected.delete(k);});render();};
+  markSel();renderTargets();renderLog();
+}
+function markSel(){const t=[...selected].reduce((a,k)=>a+calc.featTime[k],0);$('selInfo').textContent=selected.size?`${selected.size} selected · ${f1(t)} s`:'';
+  $('featTable').querySelectorAll('tr').forEach(tr=>{const c=tr.querySelector('input');if(c)tr.classList.toggle('sel',c.checked);});}
+function renderTargets(){
+  const el=$('targets');const keys=[...selected];
+  if(!keys.length){el.innerHTML='<p class="muted">Select one or more features on the left.</p>';return;}
+  const K0=kpi(calc.stations);
+  const res=OPS.map((op,ti)=>{if(ti===selStation)return null;const c=checkSet(keys,ti);const K=kpi(c.C.stations);return {ti,op,...c,newT:c.C.stations[ti].total,src:c.C.stations[selStation].total,mx:K.mx};}).filter(Boolean);
+  compute();
+  res.sort((a,b)=>(a.lv-b.lv)||(a.mx-b.mx)||(a.newT-b.newT));
+  const card=r=>`<div class="row"><div><div><b class="mono">${esc(r.op.id)}</b> <span class="pill p${r.lv}">${LEVEL[r.lv]}</span> <span class="muted" style="font-size:12.5px">${esc(r.op.machine)}</span></div>
+    <div class="mono" style="font-size:12.5px">${esc(r.op.id.replace('CYB-',''))}: ${f1(calc.stations[r.ti].total)} → <span class="${r.newT>calc.takt?'over':''}">${f1(r.newT)} s</span> · this station → ${f1(r.src)} s · bottleneck ${f1(K0.mx)} → ${f1(r.mx)} s</div>
+    ${r.r.length?`<details><summary class="muted" style="font-size:12.5px;cursor:pointer">${r.r.length} point${r.r.length>1?'s':''} to check</summary><ul class="reasons">${r.r.map(x=>`<li><span class="pill p${x[0]}">${LEVEL[x[0]]}</span> ${esc(x[1])}</li>`).join('')}</ul></details>`:''}</div>
+    <button class="sm ${r.lv===0?'pri':''}" data-ti="${r.ti}" ${r.lv===3?'disabled':''}>Move</button></div>`;
+  const easy=res.filter(r=>r.lv<2),hard=res.filter(r=>r.lv>=2);
+  el.innerHTML=(easy.length?easy.map(card).join(''):'<p class="muted" style="margin:0">No OK or Check-level station for this selection.</p>')+(hard.length?`<details><summary class="muted" style="cursor:pointer;font-size:13px;margin-top:4px">${hard.length} more station${hard.length>1?'s':''} at Major or Blocked</summary><div class="sugg" style="margin-top:6px">${hard.map(card).join('')}</div></details>`:'');
+  el.querySelectorAll('button').forEach(b=>b.onclick=()=>{applyMove(keys,+b.dataset.ti);});
+}
+function applyMove(keys,ti){keys.forEach(k=>{if(FEAT[k].si===ti)delete cur.moves[k];else cur.moves[k]=OPS[ti].id;});selected.clear();dirty=true;$('suggPanel').classList.add('hidden');render();toast(`Moved ${keys.length} feature${keys.length>1?'s':''} to ${OPS[ti].id}`);}
+function renderLog(){
+  const m=Object.entries(cur.moves);const el=$('moveLog');
+  if(!m.length){el.innerHTML='<p class="muted" style="margin:0">No moves yet. This is the line as built.</p>';return;}
+  el.innerHTML=`<div class="tw" style="max-height:300px"><table><thead><tr><th>Feature</th><th>From</th><th>To</th><th class="n">Time (s)</th><th>Check</th><th></th></tr></thead><tbody>${m.map(([k,t])=>{const F=FEAT[k];if(!F)return '';const c=check(k,idxOf(t));return `<tr><td>${esc(F.f.name)}<div class="muted" style="font-size:12px">${esc(F.f.kind)}</div></td><td class="mono">${esc(OPS[F.si].id)}</td><td class="mono">${esc(t)}</td><td class="n">${f1(calc.featTime[k])}</td><td><span class="pill p${c.lv}">${LEVEL[c.lv]}</span></td><td><button class="sm" data-k="${esc(k)}">Undo</button></td></tr>`;}).join('')}</tbody></table></div><div class="bar" style="margin-top:8px"><button class="sm" id="undoAll">Undo all moves</button></div>`;
+  el.querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{delete cur.moves[b.dataset.k];dirty=true;render();});
+  $('undoAll').onclick=()=>{cur.moves={};dirty=true;render();};
+}
+function suggest(){
+  const S=calc.stations,K=kpi(S),b=K.b.i,out=[];
+  const items=S[b].items.filter(k=>!FEAT[k].f.locked);
+  const groups={};items.forEach(k=>{const c=catOf(FEAT[k].f)+'|'+FEAT[k].f.axis;(groups[c]=groups[c]||[]).push(k);});
+  const cands=items.map(k=>[k]).concat(Object.values(groups).filter(g=>g.length>1));
+  cands.forEach(keys=>{OPS.forEach((op,ti)=>{if(ti===b)return;const c=checkSet(keys,ti);if(c.lv>=2)return;const K2=kpi(c.C.stations);
+    if(K2.mx<K.mx-0.05&&c.C.stations[ti].total<=calc.target+0.01)out.push({keys,ti,lv:c.lv,mx:K2.mx,r:c.r,newT:c.C.stations[ti].total});});});
+  compute();
+  out.sort((a,b)=>(a.lv-b.lv)||(a.mx-b.mx)||(a.keys.length-b.keys.length));
+  const seen=new Set(),top=[];for(const o of out){const id=o.keys.join()+o.ti;if(seen.has(id))continue;seen.add(id);top.push(o);if(top.length>=10)break;}
+  const el=$('suggList');$('suggPanel').classList.remove('hidden');
+  if(!top.length){el.innerHTML=`<p class="muted" style="margin:0">No OK or Check-level move off ${esc(OPS[b].id)} lowers the bottleneck without pushing the receiving station over target. Look at Major-level moves by hand, reduce handling or cutting time on ${esc(OPS[b].id)}, or raise target OEE only if it is real.</p>`;return;}
+  el.innerHTML=`<p class="note" style="margin:0 0 4px">Bottleneck ${esc(OPS[b].id)} at ${f1(K.mx)} s. These moves lower it and keep the receiving station under target.</p>`+top.map((o,i)=>{const n=o.keys.length;const F=FEAT[o.keys[0]].f;
+    return `<div class="row"><div><b>${n>1?`All ${n} × ${esc(catOf(F))} on ${esc(FACE[F.axis])} face`:esc(F.name)}</b> → <b class="mono">${esc(OPS[o.ti].id)}</b> <span class="pill p${o.lv}">${LEVEL[o.lv]}</span>
+    <div class="mono" style="font-size:12.5px">line bottleneck ${f1(K.mx)} → ${f1(o.mx)} s · ${esc(OPS[o.ti].id)} becomes ${f1(o.newT)} s</div>${o.r.length?`<ul class="reasons">${o.r.map(x=>`<li>${esc(x[1])}</li>`).join('')}</ul>`:''}</div><button class="sm" data-i="${i}">Apply</button></div>`;}).join('');
+  el.querySelectorAll('button').forEach(bt=>bt.onclick=()=>applyMove(top[+bt.dataset.i].keys,top[+bt.dataset.i].ti));
+}
+$('btnSuggest').onclick=()=>{suggest();$('suggPanel').scrollIntoView({behavior:'smooth',block:'nearest'});};
+
+// ---------- operators ----------
+function oprState(){if(!cur.opr){const assign={},manual={};OPS.forEach((op,i)=>{assign[op.id]=Math.min(4,Math.floor(i/Math.ceil(OPS.length/4))+1);manual[op.id]=Math.round(handlingOf(op));});cur.opr={count:4,assign,manual,walk:{}};}return cur.opr;}
+function renderOperators(){
+  const O=oprState();$('opCount').value=O.count;
+  const S=calc.stations;
+  $('opTable').innerHTML=S.map(s=>`<tr><td><b class="mono">${esc(s.op.id)}</b><div class="muted" style="font-size:12px">${esc(s.op.machine)}</div></td><td class="n">${f1(s.total)}</td><td class="n"><input type="number" min="0" step="1" data-m="${esc(s.op.id)}" value="${O.manual[s.op.id]??Math.round(s.h)}"></td><td><select data-a="${esc(s.op.id)}">${Array.from({length:O.count},(_,i)=>`<option value="${i+1}" ${O.assign[s.op.id]===i+1?'selected':''}>Operator ${i+1}</option>`).join('')}</select></td></tr>`).join('');
+  const ops=Array.from({length:O.count},(_,i)=>{const n=i+1;const st=S.filter(s=>(O.assign[s.op.id]||1)===n);const man=st.reduce((a,s)=>a+(+O.manual[s.op.id]||0),0);const walk=+(O.walk[n]??(st.length*8));const slow=Math.max(0,...st.filter(s=>!s.est).map(s=>s.total));return {n,st,man,walk,cyc:Math.max(man+walk,slow),slow};});
+  $('opSum').innerHTML=ops.map(o=>`<tr><td>Operator ${o.n}<div class="muted" style="font-size:12px">${o.st.map(s=>esc(s.op.id.replace('CYB-',''))).join(', ')||'no stations'}</div></td><td class="n">${f1(o.man)}</td><td class="n"><input type="number" min="0" step="1" data-w="${o.n}" value="${o.walk}"></td><td class="n">${f1(o.man+o.walk)}</td><td class="n">${f1(o.slow)}</td><td class="n ${o.cyc>calc.takt?'over':''}">${Math.round(o.cyc/calc.takt*100)}%</td></tr>`).join('');
+  drawYama($('opChart'),ops.map(o=>({label:'Op '+o.n,full:'Operator '+o.n,sub:o.st.map(s=>s.op.id.replace('CYB-','')).join(', '),segs:[['hand',o.man,'Manual work'],['walk',o.walk,'Walking']],total:o.man+o.walk})),null,{h:260});
+  $('opTable').querySelectorAll('input[data-m]').forEach(i=>i.onchange=()=>{O.manual[i.dataset.m]=Math.max(0,+i.value||0);dirty=true;render();});
+  $('opTable').querySelectorAll('select').forEach(sl=>sl.onchange=()=>{O.assign[sl.dataset.a]=+sl.value;dirty=true;render();});
+  $('opSum').querySelectorAll('input[data-w]').forEach(i=>i.onchange=()=>{O.walk[i.dataset.w]=Math.max(0,+i.value||0);dirty=true;render();});
+}
+$('opCount').onchange=()=>{const O=oprState();O.count=Math.max(1,Math.min(12,Math.round(+$('opCount').value||1)));Object.keys(O.assign).forEach(k=>{if(O.assign[k]>O.count)O.assign[k]=O.count;});dirty=true;render();};
+
+// ---------- model ----------
+function renderModel(){
+  $('cDemand').value=CFG.demand;$('cShifts').value=CFG.shifts;$('cMin').value=CFG.minPerShift;$('cOee').value=CFG.oee;$('cTc').value=CFG.toolChange;$('cDrillMm').value=CFG.drillPerMm;
+  $('taktCalc').innerHTML=`Takt = ${CFG.shifts} × ${CFG.minPerShift} min × 60 ÷ ${CFG.demand} = <b class="mono">${f1(calc.takt)} s</b> (${fmtM(calc.takt)}). Target cycle = takt × ${CFG.oee}% = <b class="mono">${f1(calc.target)} s</b>. These are the line's shared numbers: set them to your real plan.`;
+  $('ctTable').innerHTML=calc.stations.map(s=>{const fit=s.fit;const bad=fit!=null&&(fit<0.4||fit>2.5);return `<tr><td><b class="mono">${esc(s.op.id)}</b></td><td>${esc(s.op.machine)}</td><td class="n">${s.op.ct??'<span class="muted">not given</span>'}</td><td class="n"><input type="number" step="0.01" min="0" data-ct="${esc(s.op.id)}" value="${CFG.ctOverride[s.op.id]??''}" placeholder="–"></td><td class="n"><input type="number" step="1" min="0" data-h="${esc(s.op.id)}" value="${handlingOf(s.op)}"></td><td class="n ${bad?'over':''}" title="Scale from standard times to the real cycle: near 1 means the standard times match this machine">${fit==null?(s.ct?'all measured':'<span class="muted">no CT, using standards</span>'):'× '+f2(fit)}</td></tr>`;}).join('');
+  const cnt={};OPS.forEach(op=>op.features.forEach(f=>{const c=catOf(f);cnt[c]=(cnt[c]||0)+1;}));
+  $('catTable').innerHTML=DEF_CAT.map(c=>`<tr><td>${c[0]}${c[0]==='Drill'?' <span class="muted">(base)</span>':''}</td><td class="n"><input type="number" step="0.5" min="0" data-c="${esc(c[0])}" value="${CFG.cat[c[0]]??c[2]}"></td><td class="n">${cnt[c[0]]||0}</td></tr>`).join('');
+  const st=Object.entries(STUDIES);
+  $('studyTable').innerHTML=st.length?st.map(([k,v])=>`<tr><td>${esc(FEAT[k]?.f.name||k)}<div class="muted" style="font-size:12px">${esc(k.split('|')[0])}</div></td><td class="n">${f1(v.sec)}</td><td class="muted" style="font-size:12px"><span data-uid="${esc(v.by||'')}">…</span><br>${esc((v.at||'').slice(0,10))}</td><td><button class="sm" data-k="${esc(k)}">Remove</button></td></tr>`).join(''):'<tr><td colspan="4" class="muted">No measured times yet. Click a time in Move work to add one.</td></tr>';
+  $('studyTable').querySelectorAll('button').forEach(b=>b.onclick=()=>saveStudy(b.dataset.k,null));
+  resolveNames($('studyTable'));
+  const bindCfg=(sel,fn)=>document.querySelectorAll(sel).forEach(i=>i.onchange=()=>{fn(i);saveCfg();render();});
+  bindCfg('[data-ct]',i=>{const v=parseFloat(i.value);if(v>0)CFG.ctOverride[i.dataset.ct]=v;else delete CFG.ctOverride[i.dataset.ct];});
+  bindCfg('[data-h]',i=>{CFG.handling[i.dataset.h]=Math.max(0,+i.value||0);});
+  bindCfg('[data-c]',i=>{CFG.cat[i.dataset.c]=Math.max(0,+i.value||0);});
+}
+[['cDemand','demand',1],['cShifts','shifts',1],['cMin','minPerShift',1],['cOee','oee',1],['cTc','toolChange',0],['cDrillMm','drillPerMm',0]].forEach(([id,k,min])=>{$(id).onchange=()=>{const v=parseFloat($(id).value);if(!(v>=min))return render();CFG[k]=k==='oee'?Math.min(100,v):v;saveCfg();render();};});
+
+// ---------- scenarios ----------
+function renderScenSel(){
+  const sel=$('scenSel');const list=Object.entries(SCENS).sort((a,b)=>String(a[1].name).localeCompare(b[1].name));
+  sel.innerHTML=`<option value="">Baseline (line as built)</option>`+list.map(([id,s])=>`<option value="${esc(id)}">${esc(s.name)} · ${Object.keys(s.moves||{}).length} moves</option>`).join('')+(cur.id&&!SCENS[cur.id]?`<option value="${esc(cur.id)}">${esc(cur.name)} (unsaved)</option>`:'');
+  sel.value=cur.id;
+  $('btnSave').disabled=!db||!canWrite||!cur.id||!dirty;$('btnSaveAs').disabled=!db||!canWrite;$('btnDel').disabled=!db||!canWrite||!cur.id||!SCENS[cur.id];
+}
+$('scenSel').onchange=async()=>{const id=$('scenSel').value;if(dirty&&!(await ask('Discard unsaved changes?','<p class="muted">Your moves in the current scenario have not been saved.</p>')))return renderScenSel();loadScen(id);};
+function loadScen(id){const s=SCENS[id];cur=s?{id,name:s.name,moves:Object.assign({},s.moves||{}),opr:s.opr?JSON.parse(JSON.stringify(s.opr)):null}:{id:'',name:'Baseline',moves:{},opr:null};dirty=false;selected.clear();$('suggPanel').classList.add('hidden');render();}
+$('btnSave').onclick=()=>saveScen(cur.id,cur.name,SCENS[cur.id]?.note||'');
+$('btnSaveAs').onclick=async()=>{const r=await ask('Save scenario as',`<label class="muted" style="display:grid;gap:4px;font-size:12.5px">Name<input type="text" id="nmIn" maxlength="80" value="${esc(cur.id?cur.name+' copy':'')}" placeholder="e.g. Move taps to 180M-2"></label><label class="muted" style="display:grid;gap:4px;font-size:12.5px;margin-top:8px">Note (optional)<input type="text" id="ntIn" maxlength="300"></label>`,()=>({n:$('nmIn').value.trim(),t:$('ntIn').value.trim()}));if(!r||!r.n)return;const id='s'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);saveScen(id,r.n,r.t);};
+$('btnDel').onclick=async()=>{if(!(await ask('Delete scenario?',`<p class="muted">"${esc(cur.name)}" will be removed for everyone.</p>`)))return;try{await db.doc('scenarios/'+cur.id).delete();delete SCENS[cur.id];loadScen('');toast('Scenario deleted');}catch(e){dbErr(e);}};
+async function saveScen(id,name,note){if(!db)return;const body={name,note,moves:cur.moves,opr:cur.opr||null,by:myId||'',at:new Date().toISOString(),bottleneck:kpi(calc.stations).mx,source:LINE.source.version};
+  try{await db.doc('scenarios/'+id).set(JSON.parse(JSON.stringify(body)));SCENS[id]=body;cur.id=id;cur.name=name;dirty=false;render();toast('Scenario saved');}catch(e){dbErr(e);}}
+
+// ---------- studies & config writes ----------
+async function editStudy(k){const F=FEAT[k];const curv=STUDIES[k]?.sec;
+  const r=await ask('Measured time',`<p class="muted" style="margin:0 0 8px">${esc(F.f.name)} · ${esc(F.f.kind)}<br>Model estimate ${f1(calc.featTime[k])} s. Enter the cutting time from a stopwatch or the machine's program timer, tool change excluded.</p><input type="number" id="stIn" step="0.1" min="0" value="${curv??''}" style="width:120px"> s${curv!=null?' <span class="muted">(clear the box to remove)</span>':''}`,()=>$('stIn').value);
+  if(r===false||r==null)return;const v=parseFloat(r);saveStudy(k,v>=0&&r!==''?v:null);}
+async function saveStudy(k,v){
+  if(v==null)delete STUDIES[k];else STUDIES[k]={sec:v,by:myId||'',at:new Date().toISOString()};render();
+  if(!db||!canWrite){toast('Kept in this view only: saving is off');return;}
+  try{const ref=db.doc('studies/'+safeId(k));if(v==null)await ref.delete();else await ref.set({key:k,sec:v,by:myId||'',at:STUDIES[k].at});toast('Time study saved');}catch(e){dbErr(e);}}
+let cfgTimer=null,cfgBusy=false;
+function saveCfg(){if(!db||!canWrite)return;clearTimeout(cfgTimer);cfgTimer=setTimeout(async()=>{if(cfgBusy){saveCfg();return;}cfgBusy=true;try{await db.doc('config/line').set(JSON.parse(JSON.stringify(CFG)));}catch(e){dbErr(e);}cfgBusy=false;},700);}
+function dbErr(e){const c=e&&e.code;if(c==='invalid_argument'){canWrite=false;banner(window.CYB_LOCAL?'Saving needs the edit PIN: click "Enter edit PIN" at the bottom right.':'You can view this line but not save changes. Ask the owner for Contributor access.');}else if(c==='quota_exceeded')toast('Storage full: delete old scenarios');else toast('Could not save, try again');render();}
+
+// ---------- helpers ----------
+function toast(t){const el=$('toast');el.textContent=t;el.style.display='block';clearTimeout(el._t);el._t=setTimeout(()=>el.style.display='none',2200);}
+function banner(t){const b=$('dbBanner');if(!t){b.classList.add('hidden');return;}b.textContent=t;b.classList.remove('hidden');}
+function ask(title,html,getVal){return new Promise(res=>{const d=$('dlg');$('dlgTitle').textContent=title;$('dlgBody').innerHTML=html;
+  const done=v=>{d.close();res(v);};$('dlgCancel').onclick=()=>done(false);$('dlgForm').onsubmit=e=>{e.preventDefault();done(getVal?getVal():true);};d.oncancel=()=>res(false);
+  try{d.showModal();}catch(_){d.setAttribute('open','');}const i=d.querySelector('input');if(i)setTimeout(()=>i.focus(),30);});}
+async function resolveNames(root){if(!user||!user.profiles)return;const els=[...root.querySelectorAll('[data-uid]')];const ids=[...new Set(els.map(e=>e.dataset.uid).filter(Boolean))];
+  let ps={};try{if(ids.length)ps=await user.profiles(ids)||{};}catch(_){}els.forEach(e=>{e.textContent=(ps[e.dataset.uid]&&ps[e.dataset.uid].name)||'Someone';});}
+
+// ---------- lookup (search engine) ----------
+const V3D=!!window.CYB_LOCAL;if(V3D)$('tab3d').style.display='';
+const link3d=(F)=>V3D?`<a class="v3d" href="viewer/#op=${encodeURIComponent(OPS[F.si].id)}&f=${encodeURIComponent(F.f.id)}" title="Show where this is on the workpiece (3D)">📍 View on workpiece</a>`:'';
+function noOf(f){const m=/\d{3}/.exec(f.id)||/\d{3}/.exec(f.name);if(m)return m[0];if(/^KP\d/.test(f.id))return 'Knock pin '+f.id.slice(2);return f.name;}
+let LIDX=null,DOCS=[],LQ='',LF={m:'',face:'',work:''},LSHOW=20,sugI=-1,SUGS=[];
+const norm=t=>String(t).toLowerCase().replace(/ø/g,'ø').replace(/cyb-?/g,'').replace(/\s+/g,' ').trim();
+function buildIdx(){LIDX={};Object.entries(FEAT).forEach(([k,F])=>{const n=noOf(F.f);(LIDX[n]=LIDX[n]||[]).push(k);});}
+function docs(){ // rebuilt per render so scenario moves are reflected
+  return Object.keys(LIDX).map(n=>{const ks=LIDX[n].slice().sort((a,b)=>(calc.where[a]-calc.where[b])||(FEAT[a].fi-FEAT[b].fi));
+    const steps=ks.map(k=>{const F=FEAT[k],f=F.f,op=OPS[calc.where[k]];return {k,F,f,op,moved:calc.where[k]!==F.si};});
+    const isNum=/^\d{3}$/.test(n);
+    return {n,isNum,steps,machines:[...new Set(steps.map(s=>s.op.machine))],stations:[...new Set(steps.map(s=>s.op.id))],faces:[...new Set(steps.map(s=>FACE[s.f.axis]||s.f.axis))],works:[...new Set(steps.map(s=>catOf(s.f)))],
+      fields:{num:norm(n),name:norm(steps.map(s=>s.f.name).join(' | ')),kind:norm(steps.map(s=>s.f.kind).join(' | ')),st:norm(steps.map(s=>s.op.id+' '+s.op.machine+' '+s.op.name).join(' | ')),face:norm(steps.map(s=>(FACE[s.f.axis]||'')+' face '+s.f.level).join(' | ')),pos:norm(steps.map(s=>s.f.pos).join(' | ')),work:norm(steps.map(s=>catOf(s.f)).join(' '))}};});
+}
+function tokens(q){return norm(q).split(/[\s,]+/).filter(Boolean);}
+function score(d,toks){let sc=0;for(const t of toks){let s=0;const F=d.fields;
+  if(F.num===t)s=1000;else if(d.isNum&&F.num.startsWith(t))s=400;else if(F.num.includes(t))s=200;
+  if(F.name.includes(t))s=Math.max(s,new RegExp('\\b'+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).test(F.name)?60:40);
+  if(F.work.includes(t))s=Math.max(s,35);if(F.kind.includes(t))s=Math.max(s,30);if(F.st.includes(t))s=Math.max(s,28);if(F.face.includes(t))s=Math.max(s,20);if(F.pos.includes(t))s=Math.max(s,8);
+  if(!s)return 0;sc+=s;}return sc+(d.isNum?1:0);}
+function hl(text,toks){let h=esc(text);if(!toks.length)return h;const pats=toks.filter(t=>t.length>0).map(t=>t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).sort((a,b)=>b.length-a.length);
+  if(!pats.length)return h;return h.replace(new RegExp('('+pats.join('|')+')','gi'),'<mark>$1</mark>');}
+function lev(a,b){const m=a.length,n=b.length;const d=Array.from({length:m+1},(_,i)=>[i]);for(let j=1;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n];}
+function recent(){try{return JSON.parse(localStorage.getItem('cyb_recent')||'[]');}catch(_){return [];}}
+function addRecent(q){if(!q)return;try{const r=recent().filter(x=>x!==q);r.unshift(q);localStorage.setItem('cyb_recent',JSON.stringify(r.slice(0,6)));}catch(_){}}
+function search(q){const toks=tokens(q);const D=DOCS;let res=toks.length?D.map(d=>({d,s:score(d,toks)})).filter(x=>x.s>0):[];
+  res.sort((a,b)=>(b.s-a.s)||a.d.n.localeCompare(b.d.n,undefined,{numeric:true}));return {toks,res};}
+function renderLookup(){
+  if(!LIDX)buildIdx();DOCS=docs();
+  const home=!LQ;$('srch').classList.toggle('home',home);$('lbody').classList.toggle('hidden',home);$('lclear').classList.toggle('hidden',!$('lq').value);
+  if(home){const ex=['553','351','Tap front','Ø6.8','Makino MJ-61','170','bore','140M-B'];const rc=recent();
+    $('lex').innerHTML=(rc.length?`<span class="muted" style="font-size:12.5px;width:100%">Recent</span>`+rc.map(q=>`<span class="chip" data-q="${esc(q)}">${esc(q)}</span>`).join('')+`<span style="width:100%"></span>`:'')+`<span class="muted" style="font-size:12.5px;width:100%">Try</span>`+ex.map(q=>`<span class="chip" data-q="${esc(q)}">${esc(q)}</span>`).join('');
+    $('lex').querySelectorAll('.chip').forEach(c=>c.onclick=()=>doSearch(c.dataset.q));return;}
+  $('lex').innerHTML='';
+  const t0=performance.now();const {toks,res}=search(LQ);
+  // facets on the unfiltered result set
+  const cnt=(fn)=>{const o={};res.forEach(x=>fn(x.d).forEach(v=>o[v]=(o[v]||0)+1));return Object.entries(o).sort((a,b)=>b[1]-a[1]);};
+  const fm=cnt(d=>d.machines),ff=cnt(d=>d.faces),fw=cnt(d=>d.works);
+  const filt=res.filter(x=>(!LF.m||x.d.machines.includes(LF.m))&&(!LF.face||x.d.faces.includes(LF.face))&&(!LF.work||x.d.works.includes(LF.work)));
+  const dt=(performance.now()-t0)/1000;
+  const chipRow=(lbl,key,arr,max)=>arr.length>1||LF[key]?`<span class="lb">${lbl}</span>`+`<span class="chip ${!LF[key]?'on':''}" data-f="${key}" data-v="">All</span>`+arr.slice(0,max).map(([v,c])=>`<span class="chip ${LF[key]===v?'on':''}" data-f="${key}" data-v="${esc(v)}">${esc(v)}<b>${c}</b></span>`).join('')+'<span style="width:100%"></span>':'';
+  $('lfac').innerHTML=res.length?chipRow('Machine','m',fm,8)+chipRow('Face','face',ff,6)+chipRow('Work','work',fw,8):'';
+  $('lfac').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{LF[c.dataset.f]=c.dataset.v;LSHOW=20;renderLookup();});
+  const moved=Object.keys(cur.moves).length>0;
+  $('lcount').textContent=`About ${filt.length} result${filt.length===1?'':'s'} (${dt.toFixed(3)} seconds)`+(moved?` · scenario "${cur.name}"`:'');
+  // did you mean
+  let dym='';
+  if(!res.length){const t=toks.join(' ');const cands=DOCS.filter(d=>d.isNum).map(d=>[d.n,lev(t,d.n)-(t.startsWith(d.n)||d.n.startsWith(t)?0.5:0)]).sort((a,b)=>a[1]-b[1]).filter(x=>x[1]<=2).slice(0,3);
+    const words=['tap','drill','bore','chamfer','counterbore','ream','boss','pad','face','notch','broach','front','rear','left','right','top','bottom','makino','horkos','spm'];
+    const w=toks.map(tk=>{if(/^\d/.test(tk))return tk;const b=words.map(x=>[x,lev(tk,x)]).sort((a,b)=>a[1]-b[1])[0];return b[1]<=2?b[0]:tk;}).join(' ');
+    const opts=[...new Set([...(w!==t?[w]:[]),...cands.map(c=>c[0])])].slice(0,4);
+    dym=opts.length?`<p class="dym">Did you mean: ${opts.map(o=>`<a data-q="${esc(o)}">${esc(o)}</a>`).join(', ')}?</p>`:'';
+    dym+=`<p class="muted">No process matches <b>${esc(LQ)}</b>. Try just the number (e.g. 553), a machine name, or a work type like tap or bore.</p>`;}
+  $('ldym').innerHTML=dym;$('ldym').querySelectorAll('a').forEach(a=>a.onclick=()=>doSearch(a.dataset.q));
+  const top=filt.length&&toks.length===1&&filt[0].d.fields.num===toks[0];
+  $('lres').innerHTML=filt.slice(0,LSHOW).map((x,i)=>{const d=x.d;const open=top&&i===0;
+    const title=d.isNum?`Process ${d.n} · ${d.steps.map(s=>s.f.name.replace(/\s*\d{3}.*$/,'')||s.f.name).filter((v,i,a)=>a.indexOf(v)===i).join(', ')}`:d.n;
+    const snip=d.steps.map(s=>s.f.kind).filter((v,i,a)=>a.indexOf(v)===i).join(' · ');
+    return `<div class="r"><div class="url">${hl(d.faces.join(', ')+' face',toks)} › ${d.steps.length} step${d.steps.length>1?'s':''}${d.steps.some(s=>s.moved)?' › moved in scenario':''}</div>
+      <h4 data-i="${i}">${hl(title,toks)}</h4>
+      <div class="sn">${hl(snip,toks)}</div>
+      <div class="path">${d.steps.map((s,j)=>`${j?'<span class="arr">→</span>':''}<span class="pm" title="${esc(s.op.name)}">${hl(s.op.id,toks)} · ${hl(s.op.machine,toks)}</span>`).join('')}</div>
+      <div class="det ${open?'':'hidden'}" id="det${i}"><div class="steps">${d.steps.map((s,j)=>`<div class="stp"><span class="k">${j+1}</span><span class="m">${esc(s.op.id)}<small>${esc(s.op.machine)}</small></span><div><b>${hl(s.f.name,toks)}</b>${link3d(s.F)} ${s.moved?`<span class="tag m">moved from ${esc(OPS[s.F.si].id)}</span>`:''}<div style="font-size:13px">${hl(s.f.kind,toks)}</div><div class="muted" style="font-size:12.5px">${esc(FACE[s.f.axis]||s.f.axis)} face · ${hl(s.f.pos,toks)}${s.f.level&&s.f.level!==(FACE[s.f.axis]||'')+' face'?' · '+esc(s.f.level):''}</div></div></div>`).join('')}</div></div>
+    </div>`;}).join('')+(filt.length>LSHOW?`<div class="more"><button id="lmore">Show more results (${filt.length-LSHOW} left)</button></div>`:'');
+  $('lres').querySelectorAll('h4').forEach(h=>h.onclick=()=>$('det'+h.dataset.i).classList.toggle('hidden'));
+  if($('lmore'))$('lmore').onclick=()=>{LSHOW+=20;renderLookup();};
+}
+function doSearch(q){q=String(q||'').trim();$('lq').value=q;LQ=q;LF={m:'',face:'',work:''};LSHOW=20;closeSug();if(q)addRecent(q);if(tab!=='lookup')go('lookup');renderLookup();window.scrollTo({top:0});}
+function suggestions(q){if(!LIDX)buildIdx();if(!DOCS.length)DOCS=docs();const out=[];const t=norm(q);
+  if(!t){recent().forEach(r=>out.push({q:r,t:r,d:'Recent search',ty:'recent'}));return out.slice(0,6);}
+  const {toks,res}=search(q);
+  res.slice(0,6).forEach(x=>{const d=x.d;out.push({q:d.n,t:d.n,d:d.steps.map(s=>s.op.id.replace('CYB-','')+' '+s.op.machine).join(' → ')+' · '+d.steps[0].f.kind,ty:d.isNum?'process':'feature'});});
+  const ms=[...new Set(OPS.map(o=>o.machine))].filter(m=>norm(m).includes(t)).slice(0,3);
+  ms.forEach(m=>{const n=DOCS.filter(d=>d.machines.includes(m)).length;out.push({q:m,t:m,d:`${n} process numbers`,ty:'machine'});});
+  OPS.filter(o=>norm(o.id).includes(t)||norm(o.name).includes(t)).slice(0,2).forEach(o=>out.push({q:o.id,t:o.id,d:o.name+' · '+o.machine,ty:'station'}));
+  DEF_CAT.map(c=>c[0]).filter(c=>norm(c).startsWith(t)).slice(0,2).forEach(c=>out.push({q:c,t:c,d:`all ${c.toLowerCase()} work`,ty:'work'}));
+  const seen=new Set();return out.filter(o=>!seen.has(o.q)&&seen.add(o.q)).slice(0,9).map(o=>({...o,toks}));}
+function showSug(){const q=$('lq').value;SUGS=suggestions(q);sugI=-1;const box=$('sugbox');
+  if(!SUGS.length){closeSug();return;}
+  box.innerHTML=(!q.trim()?'<div class="sghd">Recent</div>':'')+SUGS.map((s,i)=>`<div class="sg" role="option" data-i="${i}"><span class="t">${hl(s.t,s.toks||[])}</span><span class="d">${esc(s.d)}</span><span class="ty">${s.ty}</span></div>`).join('');
+  box.querySelectorAll('.sg').forEach(el=>el.onmousedown=e=>{e.preventDefault();doSearch(SUGS[+el.dataset.i].q);});
+  $('sbox').classList.add('open');$('lq').setAttribute('aria-expanded','true');}
+function closeSug(){$('sbox').classList.remove('open');$('lq').setAttribute('aria-expanded','false');sugI=-1;}
+function moveSug(d){if(!SUGS.length)return;const n=SUGS.length+1;sugI=((sugI+1+d)%n+n)%n-1;
+  $('sugbox').querySelectorAll('.sg').forEach((el,i)=>el.classList.toggle('on',i===sugI));}
+let sgT;$('lq').oninput=()=>{$('lclear').classList.toggle('hidden',!$('lq').value);clearTimeout(sgT);sgT=setTimeout(showSug,60);};
+$('lq').onfocus=showSug;$('lq').onblur=()=>setTimeout(closeSug,120);
+$('lq').onkeydown=e=>{if(e.key==='ArrowDown'){e.preventDefault();if(!$('sbox').classList.contains('open'))showSug();moveSug(1);}else if(e.key==='ArrowUp'){e.preventDefault();moveSug(-1);}
+  else if(e.key==='Enter'){e.preventDefault();doSearch(sugI>=0?SUGS[sugI].q:$('lq').value);$('lq').blur();}else if(e.key==='Escape'){closeSug();}};
+$('lgo').onclick=()=>doSearch($('lq').value);
+$('lclear').onclick=()=>{$('lq').value='';LQ='';renderLookup();$('lq').focus();};
+addEventListener('keydown',e=>{if(e.key==='/'&&tab==='lookup'&&document.activeElement!==$('lq')&&!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)){e.preventDefault();$('lq').focus();}});
+
+// ---------- tabs ----------
+function go(t){if(location.hash!=='#'+t)location.hash=t;else{tab=t;showTab();}}
+function showTab(){const h=location.hash.slice(1);tab=['balance','rebalance','operators','model','lookup'].includes(h)?h:'balance';
+  document.querySelectorAll('#tabs a').forEach(a=>a.classList.toggle('on',a.dataset.t===tab));
+  ['balance','rebalance','operators','model','lookup'].forEach(t=>$('v-'+t).classList.toggle('hidden',t!==tab));if(calc)render();}
+addEventListener('hashchange',showTab);
+let rz;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(calc&&(tab==='balance'||tab==='operators'))render();},150);});
+
+// ---------- boot ----------
+async function boot(){
+  try{LINE=await (await fetch('line.json')).json();}catch(e){$('srcline').textContent='Could not load line data.';return;}
+  OPS=LINE.ops;OPS.forEach((op,si)=>op.features.forEach((f,fi)=>{FEAT[keyOf(op.id,f.id)]={f,si,fi};}));
+  Object.entries(FEAT).forEach(([k,F])=>(F.f.after||[]).forEach(p=>{(SUCC[p]=SUCC[p]||[]).push(k);}));
+  const n=Object.keys(FEAT).length;
+  $('srcline').innerHTML=`DATA FROM <a href="${window.CYB_LOCAL?'viewer/':esc(LINE.source.url)}">${esc(LINE.source.title.toUpperCase())}</a> · ${OPS.length} STATIONS · ${n} FEATURES · EXTRACTED ${esc(LINE.source.extracted)}`;
+  selStation=0;showTab();render();
+  // capabilities
+  const T=setTimeout(()=>{if(!db)banner('Shared saving is not available in this view. You can still explore; changes stay on this screen.');},10000);
+  let d=null;try{d=window.claude&&await window.claude.use('db');}catch(_){}
+  try{user=window.claude&&await window.claude.use('user');}catch(_){}
+  clearTimeout(T);
+  if(!d){banner(window.CYB_LOCAL?'Cannot reach the CYB server, so nothing will be saved.':'Shared saving is not available in this view (sign in to claude.ai to save scenarios and time studies). You can still explore.');renderScenSel();return;}
+  db=d;banner('');
+  try{myId=user&&user.id?await user.id():null;}catch(_){}
+  try{const cw=user&&user.can?await user.can('data.write'):null;canWrite=cw!==false;}catch(_){canWrite=true;}
+  if(!canWrite)banner(window.CYB_LOCAL?'View only. To save scenarios and time studies, click "Enter edit PIN" at the bottom right.':'You can view scenarios but not save. Ask the owner for Contributor access.');
+  try{if(user&&user.me){const me=await user.me();if(me&&me.name)$('who').textContent='Signed in as '+me.name;}}catch(_){}
+  const loadT=setTimeout(()=>banner('Shared data is taking a while to load; what you see may be out of date.'),10000);
+  db.doc('config/line').onSnapshot(s=>{clearTimeout(loadT);if(s.exists){const v=s.data();CFG=Object.assign(JSON.parse(JSON.stringify(DEFAULT_CFG)),JSON.parse(JSON.stringify(v)));CFG.cat=Object.assign({},DEFAULT_CFG.cat,v.cat||{});}render();},()=>{});
+  db.collection('studies').onSnapshot(s=>{const o={};s.docs.forEach(d=>{const v=d.data();if(v&&v.key&&FEAT[v.key]&&v.sec>=0)o[v.key]={sec:+v.sec,by:v.by,at:v.at};});STUDIES=o;render();},()=>{});
+  db.collection('scenarios').onSnapshot(s=>{const o={};s.docs.forEach(d=>{const v=d.data();if(v&&v.name)o[d.id]={...v,moves:Object.fromEntries(Object.entries(v.moves||{}).filter(([k,t])=>FEAT[k]&&idxOf(t)>=0))};});SCENS=o;
+    if(cur.id&&SCENS[cur.id]&&!dirty){cur.moves=Object.assign({},SCENS[cur.id].moves);cur.opr=SCENS[cur.id].opr?JSON.parse(JSON.stringify(SCENS[cur.id].opr)):null;cur.name=SCENS[cur.id].name;}render();},()=>{});
+}
+boot();
+})();
+</script>
+</body>
+</html>
